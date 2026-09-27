@@ -1,38 +1,39 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Revisar importação{% endblock %}
-{% block content %}
-<h1>Revise antes de salvar</h1>
-<p class="subtitle">Encontrei {{ candidatos|length }} lançamento(s). Confira o tipo, valor e categoria de cada um — desmarque os que não quiser importar.</p>
+{% block voltar %}<a class="voltar" href="{{ url_for('importar') }}" aria-label="Voltar">{{ icon('seta-esq', 26) }}</a>{% endblock %}
 
-<form method="POST">
-  <input type="hidden" name="total" value="{{ candidatos|length }}">
-  <table class="full-table review-table">
-    <thead>
-      <tr><th></th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th></tr>
-    </thead>
-    <tbody>
-      {% for c in candidatos %}
-      <tr>
-        <td><input type="checkbox" name="incluir_{{ loop.index0 }}" checked></td>
-        <td><input type="date" name="data_{{ loop.index0 }}" value="{{ c.data }}"></td>
-        <td><input type="text" name="descricao_{{ loop.index0 }}" value="{{ c.descricao }}" class="wide-input"></td>
-        <td>
-          <select name="tipo_{{ loop.index0 }}">
-            <option value="saida" {{ 'selected' if c.tipo=='saida' }}>Saída</option>
-            <option value="entrada" {{ 'selected' if c.tipo=='entrada' }}>Entrada</option>
-          </select>
-        </td>
-        <td><input type="text" name="valor_{{ loop.index0 }}" value="{{ '%.2f'|format(c.valor)|replace('.', ',') }}" class="valor-input"></td>
-        <td>
-          <input type="text" name="categoria_{{ loop.index0 }}" value="{{ c.categoria }}" list="categorias-list" class="cat-input">
-        </td>
-      </tr>
-      {% endfor %}
-    </tbody>
-  </table>
-  <datalist id="categorias-list">
-    {% for cat in categorias %}<option value="{{ cat }}">{% endfor %}
-  </datalist>
-  <button type="submit" class="btn-primary">Confirmar e salvar</button>
-</form>
+{% block content %}
+<div class="card">
+  <p class="muted" style="margin-top:0">Encontrei <strong>{{ candidatos|length }}</strong> lançamento(s). Confira tipo, valor e categoria, e desmarque o que não quiser importar.</p>
+  <form method="POST">
+    <input type="hidden" name="total" value="{{ candidatos|length }}">
+    <div class="tabela-rolagem">
+      <table class="tabela">
+        <thead><tr><th></th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th></tr></thead>
+        <tbody>
+          {% for c in candidatos %}
+          <tr>
+            <td><input type="checkbox" name="incluir_{{ loop.index0 }}" checked aria-label="Importar esta linha"></td>
+            <td><input type="date" name="data_{{ loop.index0 }}" value="{{ c.data }}"></td>
+            <td><input type="text" name="descricao_{{ loop.index0 }}" value="{{ c.descricao }}" class="desc-input"></td>
+            <td>
+              <select name="tipo_{{ loop.index0 }}">
+                <option value="saida" {{ 'selected' if c.tipo == 'saida' }}>Saída</option>
+                <option value="entrada" {{ 'selected' if c.tipo == 'entrada' }}>Entrada</option>
+              </select>
+            </td>
+            <td><input type="text" name="valor_{{ loop.index0 }}" value="{{ c.valor|valor_input }}" inputmode="decimal"></td>
+            <td><input type="text" name="categoria_{{ loop.index0 }}" value="{{ c.categoria }}" list="categorias-list"></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <datalist id="categorias-list">
+      {% for cat in categorias %}<option value="{{ cat }}">{% endfor %}
+    </datalist>
+    <button type="submit" class="btn btn-bloco" style="margin-top:14px">{{ icon('check', 20) }} Confirmar e salvar</button>
+  </form>
+</div>
 {% endblock %}

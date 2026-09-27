@@ -1,59 +1,50 @@
 {% extends "base.html" %}
+{% from "_icons.html" import icon %}
 {% block title %}Meu perfil{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('mais') }}" aria-label="Voltar">{{ icon('seta-esq', 26) }}</a>{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1>Meu perfil — {{ session.display_name }}</h1>
-</div>
-
-<div class="form-box">
-  <h3>Trocar senha</h3>
-  <form method="POST">
-    <input type="hidden" name="acao" value="senha">
-    <label>Senha atual</label>
-    <input type="password" name="senha_atual" required>
-    <label>Nova senha</label>
-    <input type="password" name="senha_nova" required>
-    <label>Confirmar nova senha</label>
-    <input type="password" name="senha_confirmar" required>
-    <button type="submit" class="btn-primary">Atualizar senha</button>
-  </form>
-</div>
-
-<div class="form-box">
-  <h3>Estilo visual (só muda para você)</h3>
+<div class="card">
+  <div class="secao-topo"><h2>Aparência</h2></div>
+  <p class="dica" style="margin-top:0">Só muda para você, {{ g.user.display_name }}.</p>
   <form method="POST">
     <input type="hidden" name="acao" value="estilo">
-
-    <label>Paleta de cores</label>
-    <div class="swatch-grid">
+    <span class="rotulo-campo">Cor do app</span>
+    <div class="opcoes">
       {% for key, t in THEMES.items() %}
-      <label class="swatch-option {{ 'selected' if key == tema_key }}">
-        <input type="radio" name="tema" value="{{ key }}" {{ 'checked' if key == tema_key }} style="display:none">
-        <span class="swatch-dot" style="background:{{ t.primary }};"></span>
-        <span class="swatch-dot" style="background:{{ t.secondary }};"></span>
-        {{ t.label }}
+      <label class="opcao">
+        <input type="radio" name="tema" value="{{ key }}" {{ 'checked' if key == tema_key }}>
+        <span class="bolinha-cor" style="background: {{ t.primary }}"></span>{{ t.label }}
       </label>
       {% endfor %}
     </div>
-
-    <label style="margin-top:20px;">Fundo da tela</label>
-    <div class="swatch-grid">
+    <span class="rotulo-campo">Fundo da tela</span>
+    <div class="opcoes">
       {% for key, b in BACKGROUNDS.items() %}
-      <label class="swatch-option {{ 'selected' if key == fundo_key }}">
-        <input type="radio" name="fundo" value="{{ key }}" {{ 'checked' if key == fundo_key }} style="display:none">
-        <span class="bg-preview" style="background:{{ b.css }};"></span>
-        {{ b.label }}
+      <label class="opcao">
+        <input type="radio" name="fundo" value="{{ key }}" {{ 'checked' if key == fundo_key }}>
+        <span class="amostra-fundo" style="background: {{ b.css }}"></span>{{ b.label }}
       </label>
       {% endfor %}
     </div>
-
-    <button type="submit" class="btn-primary" style="margin-top:20px;">Salvar estilo</button>
+    <button type="submit" class="btn btn-bloco">Salvar aparência</button>
   </form>
 </div>
 
-<div class="form-box">
-  <h3>Backup do banco de dados</h3>
-  <p class="hint">Baixa uma cópia do arquivo de dados (financas.db) com tudo o que já foi lançado. Guarde num lugar seguro de vez em quando.</p>
-  <a href="{{ url_for('baixar_backup') }}" class="btn-secondary">⬇ Baixar backup agora</a>
+<div class="card">
+  <div class="secao-topo"><h2>Trocar senha</h2></div>
+  <form method="POST">
+    <input type="hidden" name="acao" value="senha">
+    <div class="campo"><label for="s-atual">Senha atual</label><input id="s-atual" type="password" name="senha_atual" required autocomplete="current-password"></div>
+    <div class="campo"><label for="s-nova">Nova senha</label><input id="s-nova" type="password" name="senha_nova" required autocomplete="new-password"></div>
+    <div class="campo"><label for="s-conf">Confirmar nova senha</label><input id="s-conf" type="password" name="senha_confirmar" required autocomplete="new-password"></div>
+    <button type="submit" class="btn btn-bloco">Atualizar senha</button>
+  </form>
+</div>
+
+<div class="card">
+  <div class="secao-topo"><h2>Backup</h2></div>
+  <p class="muted" style="margin-top:0">Baixa uma cópia de todos os dados (financas.db). Guardem num lugar seguro de vez em quando.</p>
+  <a class="btn btn-claro btn-bloco" href="{{ url_for('baixar_backup') }}">{{ icon('download', 18) }} Baixar backup agora</a>
 </div>
 {% endblock %}

@@ -1,141 +1,185 @@
 {% extends "base.html" %}
-{% block title %}Dashboard{% endblock %}
+{% from "_icons.html" import icon %}
+{% from "_macros.html" import linha_lancamento, card_caixinha %}
+{% block title %}Início{% endblock %}
+
+{% block hero %}
+  <div class="saudacao">Olá, {{ g.user.display_name }} 👋</div>
+  <div class="sub">Resumo de {{ nome_mes }}</div>
+{% endblock %}
+
 {% block content %}
 
-<div class="cards-row">
-  <div class="card">
-    <div class="card-label">Entradas (mês)</div>
-    <div class="card-value positive">R$ {{ "%.2f"|format(entradas_mes)|replace(".", ",") }}</div>
+{# ---- saldo do mês + previsão ---- #}
+<a class="card card-link" href="{{ url_for('transacoes') }}">
+  <div class="secao-topo" style="margin-bottom:0">
+    <span class="rotulo">Saldo de {{ nome_mes }}</span>
+    <span class="muted">{{ icon('seta-dir', 20) }}</span>
   </div>
-  <div class="card">
-    <div class="card-label">Saídas (mês)</div>
-    <div class="card-value negative">R$ {{ "%.2f"|format(saidas_mes)|replace(".", ",") }}</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Saldo (mês)</div>
-    <div class="card-value {{ 'positive' if saldo_mes >= 0 else 'negative' }}">R$ {{ "%.2f"|format(saldo_mes)|replace(".", ",") }}</div>
-  </div>
-  <div class="card">
-    <div class="card-label">Investido (total)</div>
-    <div class="card-value future">R$ {{ "%.2f"|format(total_investido)|replace(".", ",") }}</div>
-  </div>
-</div>
+  <div class="saldo-valor money {{ 'neg' if saldo_mes < 0 }}">{{ saldo_mes|brl }}</div>
 
-{% if fixas_vencidas_count > 0 %}
-<a href="{{ url_for('contas_fixas') }}" class="alert-box alert-danger">
-  ⚠️ Você tem <strong>{{ fixas_vencidas_count }}</strong> conta(s) fixa(s) <strong>vencida(s)</strong>, totalizando R$ {{ "%.2f"|format(fixas_vencidas_total)|replace(".", ",") }}. Clique para regularizar.
-</a>
-{% endif %}
-{% if fixas_proximas_count > 0 %}
-<a href="{{ url_for('contas_fixas') }}" class="alert-box">
-  📌 Nos próximos 7 dias você tem <strong>{{ fixas_proximas_count }}</strong> conta(s) a vencer ({{ fixas_proximas_nomes }}), totalizando R$ {{ "%.2f"|format(fixas_proximas_total)|replace(".", ",") }}.
-</a>
-{% endif %}
-
-<div class="charts-row">
-  <div class="chart-box">
-    <h3>Gastos por categoria (mês atual)</h3>
-    {% if categorias_labels != '[]' %}
-    <canvas id="chartCategorias"></canvas>
-    {% else %}
-    <p class="empty">Sem saídas registradas este mês ainda.</p>
-    {% endif %}
+  <div class="saldo-linhas">
+    <div><div class="rotulo">Entrou</div><div class="money pos">{{ entradas_mes|brl }}</div></div>
+    <div><div class="rotulo">Saiu</div><div class="money neg">{{ saidas_mes|brl }}</div></div>
+    <div><div class="rotulo">Guardado</div><div class="money">{{ guardado_mes|brl }}</div></div>
   </div>
-  <div class="chart-box">
-    <h3>Evolução (últimos 6 meses)</h3>
-    <canvas id="chartEvolucao"></canvas>
-  </div>
-</div>
 
-<div class="charts-row">
-  <div class="chart-box">
-    <h3>Gasto por pessoa (mês atual)</h3>
-    <div class="pessoa-bars">
-      {% for p in pessoa_rows %}
-      <div class="pessoa-row">
-        <span class="pessoa-nome">{{ p.nome }}</span>
-        <div class="pessoa-bar-track">
-          <div class="pessoa-bar-fill" style="width: {{ (p.total / (saidas_mes if saidas_mes > 0 else 1) * 100)|round(1) }}%; background:{{ p.cor }}"></div>
-        </div>
-        <span class="pessoa-valor">R$ {{ "%.2f"|format(p.total)|replace(".", ",") }}</span>
-      </div>
-      {% endfor %}
+  <div class="previsao {{ 'sobra' if sobra >= 0 else 'falta' }}">
+    <span class="emoji">{{ '✅' if sobra >= 0 else '⚠️' }}</span>
+    <div>
+      {% if pendentes %}
+        Depois de pagar <span class="money">{{ a_pagar|brl }}</span> em contas,
+        {{ 'vai sobrar' if sobra >= 0 else 'vai faltar' }} <strong class="money">{{ sobra|abs|brl }}</strong>
+      {% elif contas %}
+        Todas as contas do mês pagas! {{ 'Sobrando' if sobra >= 0 else 'Faltando' }} <strong class="money">{{ sobra|abs|brl }}</strong>
+      {% else %}
+        {{ 'Sobrando' if sobra >= 0 else 'Faltando' }} <strong class="money">{{ sobra|abs|brl }}</strong> este mês
+      {% endif %}
     </div>
   </div>
+</a>
 
-  <div class="chart-box">
-    <h3>Despesas fixas x Entradas (mês)</h3>
-    <div class="pessoa-bars">
-      <div class="pessoa-row">
-        <span class="pessoa-nome">Fixas</span>
-        <div class="pessoa-bar-track">
-          <div class="pessoa-bar-fill" style="width: {{ (fixas_mes_total / (entradas_mes if entradas_mes > 0 else 1) * 100)|round(1) }}%; background:var(--purple)"></div>
-        </div>
-        <span class="pessoa-valor">R$ {{ "%.2f"|format(fixas_mes_total)|replace(".", ",") }}</span>
-      </div>
-      <div class="pessoa-row">
-        <span class="pessoa-nome">Entradas</span>
-        <div class="pessoa-bar-track">
-          <div class="pessoa-bar-fill" style="width: 100%; background:var(--green)"></div>
-        </div>
-        <span class="pessoa-valor">R$ {{ "%.2f"|format(entradas_mes)|replace(".", ",") }}</span>
-      </div>
-    </div>
-    {% if entradas_mes > 0 %}
-    <p class="hint">As contas fixas comprometem <strong>{{ (fixas_mes_total / entradas_mes * 100)|round(1) }}%</strong> das entradas do mês.</p>
-    {% endif %}
-  </div>
+{# ---- atalhos ---- #}
+<div class="atalhos">
+  <a class="atalho" href="{{ url_for('nova_transacao', tipo='entrada') }}"><span class="atalho-circulo">{{ icon('entrada', 26) }}</span>Entrada</a>
+  <a class="atalho" href="{{ url_for('nova_transacao', tipo='saida') }}"><span class="atalho-circulo">{{ icon('saida', 26) }}</span>Saída</a>
+  <a class="atalho" href="{{ url_for('contas_fixas') }}"><span class="atalho-circulo">{{ icon('pagar', 26) }}</span>Pagar</a>
+  <a class="atalho" href="{{ url_for('investimentos') }}"><span class="atalho-circulo">{{ icon('guardar', 26) }}</span>Guardar</a>
+  <a class="atalho" href="{{ url_for('importar') }}"><span class="atalho-circulo">{{ icon('importar', 26) }}</span>Importar</a>
 </div>
 
-<div class="chart-box" style="margin-bottom:24px;">
-  <h3>Últimos lançamentos</h3>
-  <table class="mini-table">
-    <tbody>
-    {% for t in ultimas %}
-      <tr>
-        <td>{{ t.data }}</td>
-        <td>{{ t.descricao[:32] }}</td>
-        <td><span class="tag">{{ t.categoria or '—' }}</span></td>
-        <td class="{{ 'positive' if t.tipo=='entrada' else 'negative' }}">
-          {{ '+' if t.tipo=='entrada' else '-' }}R$ {{ "%.2f"|format(t.valor)|replace(".", ",") }}
-        </td>
-      </tr>
+<div class="grade-2">
+  {# ---- contas do mês ---- #}
+  <section class="card">
+    <div class="secao-topo">
+      <h2>Contas do mês</h2>
+      <a href="{{ url_for('contas_fixas') }}">Ver todas {{ icon('seta-dir', 18) }}</a>
+    </div>
+    {% if contas %}
+      <div class="rotulo" style="margin-bottom:6px">{{ contas_pagas }} de {{ contas|length }} pagas
+        {% if pendentes %}· falta <span class="money">{{ a_pagar|brl }}</span>{% endif %}</div>
+      <div class="barra verde" style="margin-bottom:6px"><span style="width: {{ (contas_pagas / contas|length * 100)|round }}%"></span></div>
+      {% if pendentes %}
+      <ul class="lista">
+        {% for c in pendentes[:4] %}
+        <li class="item">
+          <div class="item-icone">{{ c.categoria_padrao|cat_icon }}</div>
+          <div class="item-corpo">
+            <div class="item-titulo">{{ c.descricao }}</div>
+            <div class="item-sub"><span class="selo selo-{{ c.situacao }}">{{ c.situacao_texto }}</span></div>
+          </div>
+          <div class="item-fim">
+            <span class="item-valor money">{{ c.valor|brl }}</span>
+            <a class="btn btn-sm" href="{{ url_for('pagar_conta_fixa', pid=c.id) }}">Pagar</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if pendentes|length > 4 %}<p class="muted small" style="margin:8px 0 0">e mais {{ pendentes|length - 4 }}…</p>{% endif %}
+      {% else %}
+        <div class="vazio"><span class="emoji">🎉</span>Tudo pago este mês!</div>
+      {% endif %}
     {% else %}
-      <tr><td colspan="4" class="empty">Nenhum lançamento ainda.</td></tr>
+      <div class="vazio"><span class="emoji">🧾</span>Cadastre água, luz, aluguel… e elas aparecem aqui todo mês.</div>
+      <a class="btn btn-claro btn-bloco" href="{{ url_for('contas_fixas') }}">Cadastrar conta fixa</a>
+    {% endif %}
+  </section>
+
+  {# ---- caixinhas ---- #}
+  <section class="card">
+    <div class="secao-topo">
+      <h2>Caixinhas</h2>
+      <a href="{{ url_for('investimentos') }}">Ver todas {{ icon('seta-dir', 18) }}</a>
+    </div>
+    <div class="rotulo">Total guardado</div>
+    <div class="saldo-valor money" style="font-size:1.5rem; margin-bottom:12px">{{ total_guardado|brl }}</div>
+    <div class="cx-carrossel">
+      {% for cx in caixinhas %}{{ card_caixinha(cx) }}{% endfor %}
+      <a class="cx-card cx-nova" href="{{ url_for('investimentos') }}#nova">{{ icon('mais-simples', 26) }}Nova caixinha</a>
+    </div>
+  </section>
+</div>
+
+{# ---- últimos lançamentos ---- #}
+<section class="card">
+  <div class="secao-topo">
+    <h2>Últimos lançamentos</h2>
+    <a href="{{ url_for('transacoes') }}">Extrato {{ icon('seta-dir', 18) }}</a>
+  </div>
+  {% if ultimas %}
+  <ul class="lista">
+    {% for t in ultimas %}{{ linha_lancamento(t, mostrar_data=true) }}{% endfor %}
+  </ul>
+  {% else %}
+  <div class="vazio"><span class="emoji">📭</span>Nenhum lançamento ainda. Use os atalhos acima para começar.</div>
+  {% endif %}
+</section>
+
+<div class="grade-2">
+  {# ---- para onde foi o dinheiro ---- #}
+  <section class="card">
+    <div class="secao-topo"><h2>Para onde foi o dinheiro</h2></div>
+    {% for c in categorias %}
+    <div class="categoria-linha">
+      <div class="topo"><span>{{ c.nome|cat_icon }} {{ c.nome }}</span><span class="money"><strong>{{ c.total|brl }}</strong> <span class="muted">· {{ c.pct }}%</span></span></div>
+      <div class="barra"><span style="width: {{ c.pct }}%"></span></div>
+    </div>
+    {% else %}
+    <div class="vazio">Sem saídas em {{ nome_mes }} ainda.</div>
     {% endfor %}
-    </tbody>
-  </table>
+  </section>
+
+  {# ---- quem gastou ---- #}
+  <section class="card">
+    <div class="secao-topo"><h2>Quem gastou</h2></div>
+    {% for p in pessoa_rows %}
+    <div class="pessoa">
+      <span class="bolinha" style="background: {{ p.cor }}">{{ p.nome[:1]|upper }}</span>
+      <div style="flex:1; min-width:0">
+        <div class="topo" style="display:flex; justify-content:space-between; font-size:.92rem; margin-bottom:4px">
+          <span>{{ p.nome }}</span><strong class="money">{{ p.total|brl }}</strong>
+        </div>
+        <div class="barra"><span style="width: {{ (p.total / saidas_mes * 100)|round if saidas_mes > 0 else 0 }}%; background: {{ p.cor }}"></span></div>
+      </div>
+    </div>
+    {% endfor %}
+  </section>
 </div>
 
+{# ---- evolução ---- #}
+<section class="card">
+  <div class="secao-topo"><h2>Últimos 6 meses</h2></div>
+  <div style="position:relative; height:220px"><canvas id="grafico-evolucao"></canvas></div>
+</section>
+{% endblock %}
+
+{% block scripts %}
 <script src="{{ url_for('static', filename='js/chart.js') }}"></script>
 <script>
-const catLabels = {{ categorias_labels|safe }};
-const catValores = {{ categorias_valores|safe }};
-if (catLabels.length) {
-  new Chart(document.getElementById('chartCategorias'), {
-    type: 'doughnut',
+(function () {
+  var ocultar = function () { return document.documentElement.classList.contains('ocultar-valores'); };
+  var brl = function (v) { return ocultar() ? 'R$ •••' : v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }); };
+  new Chart(document.getElementById('grafico-evolucao'), {
+    type: 'bar',
     data: {
-      labels: catLabels,
-      datasets: [{
-        data: catValores,
-        backgroundColor: ['#6c5ce7','#00b894','#fdcb6e','#e17055','#0984e3','#e84393','#00cec9','#636e72','#d63031','#a29bfe','#55efc4','#ffeaa7']
-      }]
+      labels: {{ meses_labels|safe }},
+      datasets: [
+        { label: 'Entrou', data: {{ meses_entradas|safe }}, backgroundColor: '#0a8f55', borderRadius: 6 },
+        { label: 'Saiu', data: {{ meses_saidas|safe }}, backgroundColor: '#d6383a', borderRadius: 6 }
+      ]
     },
-    options: { plugins: { legend: { position: 'bottom' } } }
+    options: {
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8 } },
+        tooltip: { callbacks: { label: function (c) { return c.dataset.label + ': ' + brl(c.parsed.y); } } }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: { beginAtZero: true, grid: { color: '#ecebf0' }, ticks: { callback: function (v) { return ocultar() ? '' : 'R$ ' + v.toLocaleString('pt-BR'); } } }
+      }
+    }
   });
-}
-
-new Chart(document.getElementById('chartEvolucao'), {
-  type: 'bar',
-  data: {
-    labels: {{ meses_labels|safe }},
-    datasets: [
-      { label: 'Entradas', data: {{ meses_entradas|safe }}, backgroundColor: '{{ tema.secondary }}' },
-      { label: 'Saídas', data: {{ meses_saidas|safe }}, backgroundColor: '#e17055' },
-      { label: 'Investimentos', data: {{ meses_investimentos|safe }}, backgroundColor: '{{ tema.primary }}' }
-    ]
-  },
-  options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
-});
+})();
 </script>
 {% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}Mais{% endblock %}
+
+{% block content %}
+<div class="card">
+  <ul class="lista menu-lista">
+    {% for endpoint, ico, titulo, sub in [
+      ('previsao', 'grafico', 'Previsão x Realizado', 'Planejem o mês e comparem com o que aconteceu'),
+      ('importar', 'importar', 'Importar extrato ou fatura', 'Lançamentos a partir de um PDF do banco'),
+      ('perfil', 'usuario', 'Meu perfil', 'Senha, cor do app e fundo da tela'),
+      ('baixar_backup', 'download', 'Baixar backup', 'Uma cópia de todos os dados, para guardar'),
+    ] %}
+    <li class="item">
+      <a class="item-link" href="{{ url_for(endpoint) }}">
+        <div class="item-icone">{{ icon(ico, 20) }}</div>
+        <div class="item-corpo"><div class="item-titulo">{{ titulo }}</div><div class="item-sub">{{ sub }}</div></div>
+        <span class="seta">{{ icon('seta-dir', 20) }}</span>
+      </a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+
+<a class="btn btn-perigo btn-bloco" href="{{ url_for('logout') }}">{{ icon('sair', 18) }} Sair</a>
+{% endblock %}

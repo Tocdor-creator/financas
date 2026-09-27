@@ -1,99 +1,49 @@
 {% extends "base.html" %}
-{% block title %}Investimentos{% endblock %}
+{% from "_icons.html" import icon %}
+{% from "_macros.html" import card_caixinha %}
+{% block title %}Caixinhas{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1>Investimentos</h1>
-  <a href="{{ url_for('sonhos') }}" class="btn-secondary">📷 Mural de sonhos</a>
-</div>
-
-<div class="cards-row">
-  <div class="card wide">
-    <div class="card-label">Total investido</div>
-    <div class="card-value future">R$ {{ "%.2f"|format(total_geral)|replace(".", ",") }}</div>
+<div class="card">
+  <div class="rotulo">Total guardado</div>
+  <div class="saldo-valor money">{{ total_geral|brl }}</div>
+  {% if selic or cdi %}
+  <div class="taxas">
+    {% if selic %}<span class="selo selo-tema" title="Meta Selic definida pelo Copom, via Banco Central">Selic {{ selic.valor|replace('.', ',') }}% ao ano</span>{% endif %}
+    {% if cdi %}<span class="selo selo-tema" title="CDI anualizado de {{ cdi.data }}, via Banco Central">CDI {{ cdi.valor|replace('.', ',') }}% ao ano</span>{% endif %}
   </div>
+  {% endif %}
 </div>
 
-{% if selic or cdi %}
-<div class="rates-box">
-  {% if selic %}<span>📈 Selic ({{ selic.data }}): <strong>{{ selic.valor }}%</strong></span>{% endif %}
-  {% if cdi %}<span>📈 CDI ({{ cdi.data }}): <strong>{{ cdi.valor }}%</strong></span>{% endif %}
-  <span class="hint-inline">taxas diárias via Banco Central — apenas referência</span>
-</div>
-{% endif %}
-
-<div class="charts-row">
-  <div class="chart-box">
-    <h3>Por instrumento</h3>
-    {% if instrumentos %}
-    <table class="mini-table">
-      <tbody>
-      {% for i in instrumentos %}
-        <tr>
-          <td>{{ i.nome }}</td>
-          <td><span class="tag">{{ i.tipo }}</span></td>
-          <td class="positive">R$ {{ "%.2f"|format(totals[i.id])|replace(".", ",") }}</td>
-          <td>
-            <form method="POST" action="{{ url_for('desativar_investimento', iid=i.id) }}" onsubmit="return confirm('Remover esse investimento da lista? O histórico é mantido.');">
-              <button type="submit" class="btn-delete">🗑</button>
-            </form>
-          </td>
-        </tr>
-      {% endfor %}
-      </tbody>
-    </table>
-    {% else %}
-    <p class="empty">Nenhum investimento cadastrado ainda.</p>
-    {% endif %}
-
-    <h3 style="margin-top:20px;">Novo investimento</h3>
-    <form method="POST" action="{{ url_for('novo_investimento') }}" class="inline-form">
-      <input type="text" name="nome" placeholder="Nome (ex: Reserva CDI 100%)" required>
-      <select name="tipo">
-        {% for t in tipos %}<option value="{{ t }}">{{ t }}</option>{% endfor %}
-      </select>
-      <button type="submit" class="btn-primary">Adicionar</button>
-    </form>
-  </div>
-
-  <div class="chart-box">
-    <h3>Nova movimentação</h3>
-    {% if instrumentos %}
-    <form method="POST" action="{{ url_for('movimento_investimento') }}" class="stack-form">
-      <select name="investimento_id" required>
-        {% for i in instrumentos %}<option value="{{ i.id }}">{{ i.nome }}</option>{% endfor %}
-      </select>
-      <select name="acao" required>
-        <option value="deposito">Aporte (guardar)</option>
-        <option value="resgate">Resgate (usar)</option>
-      </select>
-      <input type="text" name="valor" placeholder="Valor R$" required inputmode="decimal">
-      <input type="date" name="data" value="{{ today }}" required>
-      <input type="text" name="descricao" placeholder="Descrição (opcional)">
-      <button type="submit" class="btn-primary">Salvar</button>
-    </form>
-    {% else %}
-    <p class="empty">Cadastre um investimento antes de lançar movimentações.</p>
-    {% endif %}
-  </div>
+<div class="cx-grade" style="margin-bottom:14px">
+  {% for cx in caixinhas %}{{ card_caixinha(cx) }}{% endfor %}
 </div>
 
-<table class="full-table">
-  <thead><tr><th>Data</th><th>Investimento</th><th>Tipo</th><th>Descrição</th><th>Quem</th><th>Valor</th></tr></thead>
-  <tbody>
-    {% for t in rows %}
-    <tr>
-      <td>{{ t.data }}</td>
-      <td>{{ t.investimento_nome or '—' }}</td>
-      <td>{{ 'Aporte' if t.tipo=='investimento_deposito' else 'Resgate' }}</td>
-      <td>{{ t.descricao }}</td>
-      <td>{{ t.nome }}</td>
-      <td class="{{ 'positive' if t.tipo=='investimento_deposito' else 'negative' }}">
-        {{ '+' if t.tipo=='investimento_deposito' else '-' }}R$ {{ "%.2f"|format(t.valor)|replace(".", ",") }}
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="6" class="empty">Nenhuma movimentação ainda.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+<details class="card recolher" id="nova" {{ 'open' if not caixinhas }}>
+  <summary>{{ icon('mais-simples', 20) }} Nova caixinha</summary>
+  <p class="dica" style="margin-top:0">Para uma viagem, a reserva de emergência, um carro… Coloque uma foto do sonho e uma meta para acompanhar o progresso.</p>
+  <form method="POST" action="{{ url_for('novo_investimento') }}" enctype="multipart/form-data">
+    <div class="campo">
+      <label for="cx-nome">Nome</label>
+      <input id="cx-nome" type="text" name="nome" placeholder="ex: Viagem para o Chile" required>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="cx-meta">Meta (opcional)</label>
+        <input id="cx-meta" type="text" name="meta" placeholder="ex: 5.000,00" inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="cx-tipo">Onde está guardado</label>
+        <select id="cx-tipo" name="tipo">
+          {% for t in tipos %}<option value="{{ t }}" {{ 'selected' if t == 'Outro' }}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="cx-foto">Foto (opcional)</label>
+      <input id="cx-foto" type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif">
+    </div>
+    <button type="submit" class="btn btn-bloco">Criar caixinha</button>
+  </form>
+</details>
 {% endblock %}

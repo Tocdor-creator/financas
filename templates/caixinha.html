@@ -1,0 +1,103 @@
+{% extends "base.html" %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ cx.nome }}{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('investimentos') }}" aria-label="Voltar">{{ icon('seta-esq', 26) }}</a>{% endblock %}
+
+{% block content %}
+<div class="card cx-destaque">
+  {% if cx.foto %}
+    <img class="cx-foto" src="{{ url_for('ver_sonho_foto', filename=cx.foto) }}" alt="">
+  {% else %}
+    <div class="cx-foto">🐷</div>
+  {% endif %}
+  <div class="conteudo">
+    <div class="rotulo">Guardado</div>
+    <div class="saldo-valor money">{{ cx.saldo|brl }}</div>
+    {% if cx.meta %}
+      <div class="barra" style="margin:8px 0 6px"><span style="width: {{ cx.progresso }}%"></span></div>
+      <div class="rotulo">
+        {{ cx.progresso }}% da meta de <span class="money">{{ cx.meta|brl }}</span>
+        {% if cx.saldo < cx.meta %}· faltam <span class="money">{{ (cx.meta - cx.saldo)|brl }}</span>{% else %}· meta atingida! 🎉{% endif %}
+      </div>
+    {% endif %}
+    <div class="taxas"><span class="selo selo-tema">{{ cx.tipo or 'Outro' }}</span></div>
+  </div>
+</div>
+
+<div class="card">
+  <form method="POST" action="{{ url_for('movimento_investimento') }}">
+    <input type="hidden" name="investimento_id" value="{{ cx.id }}">
+    <div class="valor-grande">
+      <label for="valor">Quanto?</label>
+      <div class="caixa"><span>R$</span><input id="valor" type="text" name="valor" placeholder="0,00" required inputmode="decimal" autocomplete="off"></div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="data">Data</label>
+        <input id="data" type="date" name="data" value="{{ today }}" required>
+      </div>
+      <div class="campo">
+        <label for="descricao">Descrição (opcional)</label>
+        <input id="descricao" type="text" name="descricao" placeholder="ex: Sobra do mês">
+      </div>
+    </div>
+    <div class="botoes" style="margin-top:4px">
+      <button type="submit" name="acao" value="deposito" class="btn">{{ icon('guardar', 20) }} Guardar</button>
+      <button type="submit" name="acao" value="resgate" class="btn btn-claro">{{ icon('saida', 20) }} Resgatar</button>
+    </div>
+  </form>
+</div>
+
+<div class="card">
+  <div class="secao-topo"><h2>Movimentações</h2></div>
+  <ul class="lista">
+    {% for t in movimentos %}
+    <li class="item">
+      <div class="item-icone {{ 'caixinha' if t.tipo == 'investimento_deposito' }}">{{ '🐷' if t.tipo == 'investimento_deposito' else '💸' }}</div>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ t.descricao }}</div>
+        <div class="item-sub">{{ t.data|data_br }} · {{ t.nome }}</div>
+      </div>
+      <div class="item-fim">
+        <span class="item-valor money {{ 'pos' if t.tipo == 'investimento_deposito' }}">{{ '+' if t.tipo == 'investimento_deposito' else '−' }}{{ t.valor|brl }}</span>
+      </div>
+      <form class="inline" method="POST" action="{{ url_for('excluir_transacao', tid=t.id) }}" onsubmit="return confirm('Excluir esta movimentação?');">
+        <button type="submit" class="btn-icone perigo" title="Excluir">{{ icon('lixo', 18) }}</button>
+      </form>
+    </li>
+    {% else %}
+    <li class="vazio">Nada guardado ainda. Que tal começar hoje?</li>
+    {% endfor %}
+  </ul>
+</div>
+
+<details class="card recolher">
+  <summary>{{ icon('editar', 20) }} Editar caixinha</summary>
+  <form method="POST" action="{{ url_for('editar_caixinha', iid=cx.id) }}" enctype="multipart/form-data">
+    <div class="campo">
+      <label for="e-nome">Nome</label>
+      <input id="e-nome" type="text" name="nome" value="{{ cx.nome }}" required>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="e-meta">Meta (opcional)</label>
+        <input id="e-meta" type="text" name="meta" value="{{ cx.meta|valor_input if cx.meta }}" placeholder="sem meta" inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="e-tipo">Onde está guardado</label>
+        <select id="e-tipo" name="tipo">
+          {% for t in tipos %}<option value="{{ t }}" {{ 'selected' if t == cx.tipo }}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="e-foto">{{ 'Trocar foto' if cx.foto else 'Adicionar foto' }}</label>
+      <input id="e-foto" type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif">
+    </div>
+    <button type="submit" class="btn btn-bloco">Salvar alterações</button>
+  </form>
+  <form method="POST" action="{{ url_for('desativar_investimento', iid=cx.id) }}" style="margin-top:10px" onsubmit="return confirm('Apagar a caixinha “{{ cx.nome }}”? O histórico de movimentações continua salvo.');">
+    <button type="submit" class="btn btn-perigo btn-bloco">{{ icon('lixo', 18) }} Apagar caixinha</button>
+  </form>
+</details>
+{% endblock %}

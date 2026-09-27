@@ -56,9 +56,19 @@ NOISE_WORDS = {
     "S/A", "SA", "NACIONAL", "INTERNACIONAL",
 }
 
+CATEGORIA_ICONES = {
+    "Mercado": "🛒", "Essencial": "⚡", "Moradia": "🏠", "Transporte": "🚗", "Saúde": "💊",
+    "Educação": "📚", "Lazer": "🎉", "Assinaturas": "📺", "Salário": "💼", "Freelance": "💻",
+    "Investimento": "🐷", "Outros": "🏷️",
+}
+
+MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho",
+         "agosto", "setembro", "outubro", "novembro", "dezembro"]
+MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
+
 # Paletas de cores (tema) e fundos disponíveis para personalização por perfil
 THEMES = {
-    "roxo":    {"label": "Roxo (padrão)", "primary": "#6c5ce7", "secondary": "#00b894", "accent": "#fdcb6e"},
+    "roxo":    {"label": "Roxo (padrão)", "primary": "#820ad1", "secondary": "#00b894", "accent": "#fdcb6e"},
     "rosa":    {"label": "Rosa",          "primary": "#e84393", "secondary": "#fd79a8", "accent": "#ffb8d9"},
     "azul":    {"label": "Azul",          "primary": "#0984e3", "secondary": "#00cec9", "accent": "#74b9ff"},
     "verde":   {"label": "Verde",         "primary": "#00b894", "secondary": "#55efc4", "accent": "#a4de6c"},
@@ -198,6 +208,18 @@ def init_db():
     _garantir_coluna(db, "contas_fixas", "responsavel", "TEXT")
     _garantir_coluna(db, "users", "tema", "TEXT DEFAULT 'roxo'")
     _garantir_coluna(db, "users", "fundo", "TEXT DEFAULT 'branco'")
+    _garantir_coluna(db, "investimentos", "meta", "REAL")
+    _garantir_coluna(db, "investimentos", "foto", "TEXT")
+    db.commit()
+
+    # o antigo mural de sonhos vira caixinhas: cada foto vira uma caixinha com a legenda como nome
+    # (idempotente: a foto sai do mural depois de migrada)
+    for s in db.execute("SELECT id, filename, legenda, criado_em FROM sonhos").fetchall():
+        db.execute(
+            "INSERT INTO investimentos (nome, tipo, ativo, criado_em, foto) VALUES (?, 'Outro', 1, ?, ?)",
+            (s[2] or "Meu sonho", s[3], s[1]),
+        )
+        db.execute("DELETE FROM sonhos WHERE id = ?", (s[0],))
     db.commit()
 
     # renomeia o antigo tipo "futuro_*" para "investimento_*" (idempotente)
@@ -308,6 +330,107 @@ def save_comprovante(file_storage):
 
 def save_sonho(file_storage):
     return save_upload(file_storage, SONHOS_DIR, ALLOWED_SONHO_EXT)
+
+
+# ---------------------------------------------------------------------------
+# Formatação brasileira (filtros usados nos templates) e datas
+# ---------------------------------------------------------------------------
+
+def formatar_brl(valor, sinal=False):
+    """1234.5 -> 'R$ 1.234,50'; com sinal=True, positivos ganham '+'."""
+    valor = valor or 0
+    numero = f"{abs(valor):,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+    prefixo = "-" if valor < 0 else ("+" if sinal and valor > 0 else "")
+    return f"{prefixo}R$ {numero}"
+
+
+def _como_data(valor):
+    if isinstance(valor, str):
+        return date.fromisoformat(valor[:10])
+    return valor
+
+
+@app.template_filter("brl")
+def filtro_brl(valor, sinal=False):
+    return formatar_brl(valor, sinal)
+
+
+@app.template_filter("valor_input")
+def filtro_valor_input(valor):
+    """Valor para preencher um campo de formulário: 1234.5 -> '1234,50'."""
+    return f"{valor or 0:.2f}".replace(".", ",")
+
+
+@app.template_filter("data_br")
+def filtro_data_br(valor):
+    return _como_data(valor).strftime("%d/%m/%Y") if valor else ""
+
+
+@app.template_filter("data_curta")
+def filtro_data_curta(valor):
+    d = _como_data(valor)
+    return f"{d.day:02d} {MESES_CURTOS[d.month - 1]}" if d else ""
+
+
+@app.template_filter("dia_extenso")
+def filtro_dia_extenso(valor):
+    d = _como_data(valor)
+    hoje = date.today()
+    if d == hoje:
+        return "Hoje"
+    if d == hoje - timedelta(days=1):
+        return "Ontem"
+    texto = f"{d.day} de {MESES[d.month - 1]}"
+    return texto if d.year == hoje.year else f"{texto} de {d.year}"
+
+
+@app.template_filter("cat_icon")
+def filtro_cat_icon(categoria):
+    return CATEGORIA_ICONES.get(categoria or "", "🏷️")
+
+
+def limites_mes(ano, mes):
+    """(primeiro dia do mês, primeiro dia do mês seguinte) em ISO, para filtros data >= ini AND data < fim."""
+    ini = date(ano, mes, 1)
+    fim = date(ano + (mes == 12), mes % 12 + 1, 1)
+    return ini.isoformat(), fim.isoformat()
+
+
+def ultimos_meses(qtd, hoje=None):
+    """Lista de (ano, mes) dos últimos `qtd` meses, do mais antigo ao atual."""
+    hoje = hoje or date.today()
+    meses = []
+    for i in range(qtd - 1, -1, -1):
+        mm, yy = hoje.month - i, hoje.year
+        while mm <= 0:
+            mm += 12
+            yy -= 1
+        meses.append((yy, mm))
+    return meses
+
+
+def listar_caixinhas(db):
+    """Caixinhas ativas com o saldo guardado em cada uma e o progresso da meta (0-100 ou None)."""
+    rows = db.execute(
+        """SELECT i.*, COALESCE(SUM(CASE WHEN t.tipo='investimento_deposito' THEN t.valor
+                                        WHEN t.tipo='investimento_resgate' THEN -t.valor END), 0) AS saldo
+           FROM investimentos i LEFT JOIN transactions t ON t.investimento_id = i.id
+           WHERE i.ativo = 1 GROUP BY i.id ORDER BY i.nome"""
+    ).fetchall()
+    caixinhas = []
+    for r in rows:
+        c = dict(r)
+        c["progresso"] = max(0, min(100, round(c["saldo"] / c["meta"] * 100))) if c["meta"] else None
+        caixinhas.append(c)
+    return caixinhas
+
+
+def saldo_caixinha(db, iid):
+    return db.execute(
+        """SELECT COALESCE(SUM(CASE WHEN tipo='investimento_deposito' THEN valor ELSE -valor END), 0) t
+           FROM transactions WHERE investimento_id = ?""",
+        (iid,),
+    ).fetchone()["t"]
 
 
 # ---------------------------------------------------------------------------
@@ -539,121 +662,133 @@ def baixar_backup():
 
 
 # ---------------------------------------------------------------------------
-# Dashboard
+# Início (tela principal)
 # ---------------------------------------------------------------------------
+
+def contas_do_mes(db, competencia):
+    """Pagamentos de contas fixas da competência (mais as pendentes de meses anteriores),
+    com data de vencimento e situação para exibir."""
+    hoje = date.today()
+    rows = db.execute(
+        """SELECT p.*, c.descricao, c.dia_vencimento, c.responsavel, c.categoria AS categoria_padrao
+           FROM pagamentos_fixos p JOIN contas_fixas c ON c.id = p.conta_fixa_id
+           WHERE p.competencia = ? OR (p.status = 'pendente' AND p.competencia < ? AND c.ativo = 1)
+           ORDER BY (p.status='pago'), p.competencia, c.dia_vencimento ASC""",
+        (competencia, competencia),
+    ).fetchall()
+    contas = []
+    for r in rows:
+        c = dict(r)
+        venc = due_date_for(r["competencia"], r["dia_vencimento"])
+        c["vencimento"] = venc
+        dias = (venc - hoje).days
+        if r["status"] == "pago":
+            c["situacao"], c["situacao_texto"] = "paga", f"Paga em {filtro_data_curta(r['data_pagamento'])}"
+        elif dias < 0:
+            c["situacao"], c["situacao_texto"] = "vencida", f"Venceu {filtro_data_curta(venc)}"
+        elif dias == 0:
+            c["situacao"], c["situacao_texto"] = "hoje", "Vence hoje"
+        elif dias <= 7:
+            c["situacao"], c["situacao_texto"] = "breve", f"Vence em {dias} dia{'s' if dias > 1 else ''}"
+        else:
+            c["situacao"], c["situacao_texto"] = "futura", f"Vence {filtro_data_curta(venc)}"
+        contas.append(c)
+    return contas
+
 
 @app.route("/")
 @login_required
 def dashboard():
     db = get_db()
     today = date.today()
-    month_start = today.replace(day=1).isoformat()
-    month_end = (today.replace(day=28) + timedelta(days=4)).replace(day=1).isoformat()  # 1º dia do mês seguinte
+    ini, fim = limites_mes(today.year, today.month)
 
-    def total(tipo, since=None, until=None):
+    def soma(tipo, desde=None, ate=None):
         q = "SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo = ?"
         params = [tipo]
-        if since:
-            q += " AND data >= ?"
-            params.append(since)
-        if until:
-            q += " AND data < ?"
-            params.append(until)
+        if desde:
+            q += " AND data >= ? AND data < ?"
+            params += [desde, ate]
         return db.execute(q, params).fetchone()["t"]
 
-    entradas_mes = total("entrada", month_start, month_end)
-    saidas_mes = total("saida", month_start, month_end)
-    saldo_mes = entradas_mes - saidas_mes
+    entradas_mes = soma("entrada", ini, fim)
+    saidas_mes = soma("saida", ini, fim)
+    guardado_mes = soma("investimento_deposito", ini, fim) - soma("investimento_resgate", ini, fim)
+    saldo_mes = entradas_mes - saidas_mes - guardado_mes
 
-    total_investido = total("investimento_deposito") - total("investimento_resgate")
+    # contas fixas do mês: quanto ainda falta pagar e quanto vai sobrar/faltar depois disso
+    competencia = ensure_pagamentos_mes()
+    contas = contas_do_mes(db, competencia)
+    pendentes = [c for c in contas if c["status"] != "pago"]
+    a_pagar = sum(c["valor"] for c in pendentes)
+    contas_pagas = len(contas) - len(pendentes)
+    sobra = saldo_mes - a_pagar
 
-    # gastos por categoria (mês atual)
+    caixinhas = listar_caixinhas(db)
+    total_guardado = soma("investimento_deposito") - soma("investimento_resgate")
+
+    # para onde foi o dinheiro (saídas do mês por categoria)
     cat_rows = db.execute(
         """SELECT COALESCE(categoria,'Outros') categoria, SUM(valor) total
            FROM transactions WHERE tipo='saida' AND data >= ? AND data < ?
-           GROUP BY categoria ORDER BY total DESC""",
-        (month_start, month_end),
+           GROUP BY COALESCE(categoria,'Outros') ORDER BY total DESC""",
+        (ini, fim),
     ).fetchall()
-    categorias_labels = [r["categoria"] for r in cat_rows]
-    categorias_valores = [round(r["total"], 2) for r in cat_rows]
+    categorias = [
+        {"nome": r["categoria"], "total": r["total"], "pct": round(r["total"] / saidas_mes * 100) if saidas_mes else 0}
+        for r in cat_rows
+    ]
 
-    # evolução últimos 6 meses (entradas, saídas e investimentos)
-    meses_labels, meses_entradas, meses_saidas, meses_investimentos = [], [], [], []
-    y, m = today.year, today.month
-    months = []
-    for i in range(5, -1, -1):
-        mm = m - i
-        yy = y
-        while mm <= 0:
-            mm += 12
-            yy -= 1
-        months.append((yy, mm))
-    for yy, mm in months:
-        ini = f"{yy:04d}-{mm:02d}-01"
-        fim = f"{yy+1:04d}-01-01" if mm == 12 else f"{yy:04d}-{mm+1:02d}-01"
-        e = db.execute("SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo='entrada' AND data>=? AND data<?", (ini, fim)).fetchone()["t"]
-        s = db.execute("SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo='saida' AND data>=? AND data<?", (ini, fim)).fetchone()["t"]
-        inv = db.execute(
-            """SELECT COALESCE(SUM(CASE WHEN tipo='investimento_deposito' THEN valor ELSE -valor END),0) t
-               FROM transactions WHERE tipo LIKE 'investimento%' AND data>=? AND data<?""",
-            (ini, fim),
-        ).fetchone()["t"]
-        meses_labels.append(f"{mm:02d}/{yy}")
-        meses_entradas.append(round(e, 2))
-        meses_saidas.append(round(s, 2))
-        meses_investimentos.append(round(inv, 2))
-
-    # gasto por pessoa (mês atual)
     pessoa_rows = db.execute(
         """SELECT u.display_name nome, u.color cor, COALESCE(SUM(t.valor),0) total
            FROM users u LEFT JOIN transactions t
              ON t.user_id = u.id AND t.tipo='saida' AND t.data >= ? AND t.data < ?
            GROUP BY u.id""",
-        (month_start, month_end),
+        (ini, fim),
     ).fetchall()
+
+    # evolução dos últimos 6 meses
+    meses_labels, meses_entradas, meses_saidas = [], [], []
+    for yy, mm in ultimos_meses(6, today):
+        a, b = limites_mes(yy, mm)
+        meses_labels.append(f"{MESES_CURTOS[mm - 1]}/{str(yy)[2:]}")
+        meses_entradas.append(round(soma("entrada", a, b), 2))
+        meses_saidas.append(round(soma("saida", a, b), 2))
 
     ultimas = db.execute(
-        """SELECT t.*, u.display_name nome FROM transactions t
+        """SELECT t.*, u.display_name nome, i.nome AS caixinha_nome FROM transactions t
            JOIN users u ON u.id = t.user_id
-           ORDER BY t.data DESC, t.id DESC LIMIT 8"""
+           LEFT JOIN investimentos i ON i.id = t.investimento_id
+           ORDER BY t.data DESC, t.id DESC LIMIT 6"""
     ).fetchall()
-
-    # contas fixas: total previsto no mês (para o comparativo fixas x entradas)
-    competencia_atual = ensure_pagamentos_mes()
-    fixas_mes_total = db.execute(
-        "SELECT COALESCE(SUM(valor),0) t FROM pagamentos_fixos WHERE competencia = ?",
-        (competencia_atual,),
-    ).fetchone()["t"]
-
-    # alertas de contas fixas: vencidas e a vencer nos próximos 7 dias
-    vencidas, proximas = get_alertas_contas_fixas(7)
-    fixas_vencidas_count = len(vencidas)
-    fixas_vencidas_total = sum(r["valor"] for r, _ in vencidas)
-    fixas_proximas_count = len(proximas)
-    fixas_proximas_total = sum(r["valor"] for r, _ in proximas)
-    fixas_proximas_nomes = ", ".join(r["descricao"] for r, _ in proximas[:4])
 
     return render_template(
         "dashboard.html",
+        nome_mes=MESES[today.month - 1],
         entradas_mes=entradas_mes,
         saidas_mes=saidas_mes,
+        guardado_mes=guardado_mes,
         saldo_mes=saldo_mes,
-        total_investido=total_investido,
-        categorias_labels=json.dumps(categorias_labels),
-        categorias_valores=json.dumps(categorias_valores),
+        a_pagar=a_pagar,
+        sobra=sobra,
+        contas=contas,
+        pendentes=pendentes,
+        contas_pagas=contas_pagas,
+        caixinhas=caixinhas,
+        total_guardado=total_guardado,
+        categorias=categorias,
+        pessoa_rows=pessoa_rows,
         meses_labels=json.dumps(meses_labels),
         meses_entradas=json.dumps(meses_entradas),
         meses_saidas=json.dumps(meses_saidas),
-        meses_investimentos=json.dumps(meses_investimentos),
-        pessoa_rows=pessoa_rows,
         ultimas=ultimas,
-        fixas_mes_total=fixas_mes_total,
-        fixas_vencidas_count=fixas_vencidas_count,
-        fixas_vencidas_total=fixas_vencidas_total,
-        fixas_proximas_count=fixas_proximas_count,
-        fixas_proximas_total=fixas_proximas_total,
-        fixas_proximas_nomes=fixas_proximas_nomes,
     )
+
+
+@app.route("/mais")
+@login_required
+def mais():
+    return render_template("more.html")
 
 
 # ---------------------------------------------------------------------------
@@ -665,15 +800,52 @@ def dashboard():
 def transacoes():
     db = get_db()
     tipo_filter = request.args.get("tipo", "")
-    q = """SELECT t.*, u.display_name nome FROM transactions t
-           JOIN users u ON u.id = t.user_id WHERE t.tipo NOT LIKE 'investimento%' """
-    params = []
+    hoje = date.today()
+    try:
+        ano, mes = map(int, request.args.get("mes", "").split("-"))
+        date(ano, mes, 1)
+    except ValueError:
+        ano, mes = hoje.year, hoje.month
+    ini, fim = limites_mes(ano, mes)
+
+    q = """SELECT t.*, u.display_name nome, i.nome AS caixinha_nome FROM transactions t
+           JOIN users u ON u.id = t.user_id
+           LEFT JOIN investimentos i ON i.id = t.investimento_id
+           WHERE t.data >= ? AND t.data < ?"""
+    params = [ini, fim]
     if tipo_filter in ("entrada", "saida"):
         q += " AND t.tipo = ?"
         params.append(tipo_filter)
+    elif tipo_filter == "caixinha":
+        q += " AND t.tipo LIKE 'investimento%'"
     q += " ORDER BY t.data DESC, t.id DESC"
     rows = db.execute(q, params).fetchall()
-    return render_template("transactions.html", rows=rows, tipo_filter=tipo_filter, categorias=DEFAULT_CATEGORIES)
+
+    # agrupa por dia, como no extrato do banco
+    dias = []
+    for r in rows:
+        if not dias or dias[-1][0] != r["data"]:
+            dias.append((r["data"], []))
+        dias[-1][1].append(r)
+
+    def total(tipo):
+        return db.execute(
+            "SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo=? AND data>=? AND data<?", (tipo, ini, fim)
+        ).fetchone()["t"]
+
+    anterior = f"{ano - (mes == 1):04d}-{(mes - 2) % 12 + 1:02d}"
+    proximo = f"{ano + (mes == 12):04d}-{mes % 12 + 1:02d}"
+    return render_template(
+        "transactions.html",
+        dias=dias,
+        tipo_filter=tipo_filter,
+        mes_atual=f"{ano:04d}-{mes:02d}",
+        mes_label=f"{MESES[mes - 1].capitalize()} {ano}",
+        mes_anterior=anterior,
+        mes_proximo=proximo,
+        entradas=total("entrada"),
+        saidas=total("saida"),
+    )
 
 
 @app.route("/transacoes/nova", methods=["GET", "POST"])
@@ -682,7 +854,9 @@ def nova_transacao():
     tipo = request.args.get("tipo", "saida")
     if request.method == "POST":
         db = get_db()
-        tipo = request.form["tipo"]
+        tipo = request.form.get("tipo")
+        if tipo not in ("entrada", "saida"):
+            tipo = "saida"
         try:
             valor = parse_valor_brl(request.form["valor"])
         except ValueError:
@@ -701,7 +875,7 @@ def nova_transacao():
         if categoria and tipo == "saida":
             learn_category(descricao, categoria)
         flash("Lançamento salvo!", "success")
-        return redirect(url_for("transacoes"))
+        return redirect(url_for("transacoes", mes=data_str[:7]))
     return render_template("transaction_form.html", tipo=tipo, categorias=DEFAULT_CATEGORIES, today=date.today().isoformat())
 
 
@@ -752,56 +926,26 @@ def due_date_for(competencia, dia):
     return date(y, m, d)
 
 
-def get_alertas_contas_fixas(dias=7):
-    """Retorna (vencidas, proximas) — listas de (linha, data_vencimento)."""
-    db = get_db()
-    today = date.today()
-    limite = today + timedelta(days=dias)
-    competencias = {today.strftime("%Y-%m")}
-    if (limite.year, limite.month) != (today.year, today.month):
-        competencias.add(limite.strftime("%Y-%m"))
-    for comp in list(competencias):
-        ensure_pagamentos_mes(comp)
-    placeholders = ",".join("?" * len(competencias))
-    rows = db.execute(
-        f"""SELECT p.*, c.descricao, c.dia_vencimento FROM pagamentos_fixos p
-            JOIN contas_fixas c ON c.id = p.conta_fixa_id
-            WHERE p.status = 'pendente' AND p.competencia IN ({placeholders})""",
-        tuple(competencias),
-    ).fetchall()
-    vencidas, proximas = [], []
-    for r in rows:
-        dv = due_date_for(r["competencia"], r["dia_vencimento"])
-        if dv < today:
-            vencidas.append((r, dv))
-        elif dv <= limite:
-            proximas.append((r, dv))
-    vencidas.sort(key=lambda x: x[1])
-    proximas.sort(key=lambda x: x[1])
-    return vencidas, proximas
-
-
 @app.route("/contas-fixas")
 @login_required
 def contas_fixas():
     competencia = ensure_pagamentos_mes()
     db = get_db()
-    rows = db.execute(
-        """SELECT p.*, c.descricao, c.dia_vencimento, c.responsavel, c.categoria AS categoria_padrao
-           FROM pagamentos_fixos p JOIN contas_fixas c ON c.id = p.conta_fixa_id
-           WHERE p.competencia = ? ORDER BY (p.status='pago'), c.dia_vencimento ASC""",
-        (competencia,),
-    ).fetchall()
+    contas = contas_do_mes(db, competencia)
+    pendentes = [c for c in contas if c["status"] != "pago"]
     todas = db.execute("SELECT * FROM contas_fixas WHERE ativo = 1 ORDER BY descricao").fetchall()
     usuarios = db.execute("SELECT display_name FROM users ORDER BY display_name").fetchall()
+    y, m = map(int, competencia.split("-"))
     return render_template(
         "fixed_bills.html",
-        rows=rows,
+        contas=contas,
+        a_pagar=sum(c["valor"] for c in pendentes),
+        pago=sum(c["valor"] for c in contas if c["status"] == "pago"),
+        contas_pagas=len(contas) - len(pendentes),
         todas=todas,
-        competencia=competencia,
+        mes_label=f"{MESES[m - 1].capitalize()} {y}",
         categorias=DEFAULT_CATEGORIES,
         usuarios=usuarios,
-        today=date.today().isoformat(),
     )
 
 
@@ -910,141 +1054,154 @@ def desfazer_pagamento_fixo(pid):
 
 
 # ---------------------------------------------------------------------------
-# Investimentos (antigo "Futuro")
+# Caixinhas (dinheiro guardado: investimentos + sonhos, com foto e meta)
 # ---------------------------------------------------------------------------
 
-@app.route("/investimentos")
+def _ler_meta(texto):
+    """Meta é opcional: vazio ou zero vira None. Lança ValueError se for inválida."""
+    if not (texto or "").strip():
+        return None
+    return parse_valor_brl(texto) or None
+
+
+@app.route("/caixinhas")
 @login_required
 def investimentos():
     db = get_db()
-    instrumentos = db.execute("SELECT * FROM investimentos WHERE ativo = 1 ORDER BY nome").fetchall()
-    totals = {}
-    for inst in instrumentos:
-        r = db.execute(
-            """SELECT COALESCE(SUM(CASE WHEN tipo='investimento_deposito' THEN valor ELSE -valor END),0) t
-               FROM transactions WHERE investimento_id = ?""",
-            (inst["id"],),
-        ).fetchone()
-        totals[inst["id"]] = r["t"]
+    caixinhas = listar_caixinhas(db)
     total_geral = db.execute(
-        "SELECT COALESCE(SUM(CASE WHEN tipo='investimento_deposito' THEN valor ELSE -valor END),0) t FROM transactions WHERE tipo LIKE 'investimento%'"
+        "SELECT COALESCE(SUM(CASE WHEN tipo='investimento_deposito' THEN valor ELSE -valor END),0) t "
+        "FROM transactions WHERE tipo LIKE 'investimento%'"
     ).fetchone()["t"]
-
-    rows = db.execute(
-        """SELECT t.*, u.display_name nome, i.nome AS investimento_nome FROM transactions t
-           JOIN users u ON u.id = t.user_id
-           LEFT JOIN investimentos i ON i.id = t.investimento_id
-           WHERE t.tipo LIKE 'investimento%' ORDER BY t.data DESC, t.id DESC LIMIT 30"""
-    ).fetchall()
-
-    selic = fetch_taxa_bcb_cached(11)
-    cdi = fetch_taxa_bcb_cached(12)
-
     return render_template(
         "investments.html",
-        instrumentos=instrumentos,
-        totals=totals,
+        caixinhas=caixinhas,
         total_geral=total_geral,
-        rows=rows,
         tipos=TIPOS_INVESTIMENTO,
-        today=date.today().isoformat(),
-        selic=selic,
-        cdi=cdi,
+        selic=fetch_taxa_bcb_cached(432),   # meta Selic, % ao ano
+        cdi=fetch_taxa_bcb_cached(4389),    # CDI anualizado, % ao ano
     )
 
 
-@app.route("/investimentos/novo", methods=["POST"])
+@app.route("/caixinhas/nova", methods=["POST"])
 @login_required
 def novo_investimento():
     db = get_db()
-    nome = request.form["nome"].strip()
+    nome = request.form.get("nome", "").strip()
     tipo = request.form.get("tipo", "Outro")
     if not nome:
-        flash("Dê um nome para o investimento.", "error")
+        flash("Dê um nome para a caixinha.", "error")
         return redirect(url_for("investimentos"))
-    db.execute(
-        "INSERT INTO investimentos (nome, tipo, ativo, criado_em) VALUES (?,?,1,?)",
-        (nome, tipo, datetime.now().isoformat()),
+    try:
+        meta = _ler_meta(request.form.get("meta"))
+    except ValueError:
+        flash("Meta inválida. Use algo como 5.000,00.", "error")
+        return redirect(url_for("investimentos"))
+    foto = save_sonho(request.files.get("foto"))
+    cur = db.execute(
+        "INSERT INTO investimentos (nome, tipo, ativo, criado_em, meta, foto) VALUES (?,?,1,?,?,?)",
+        (nome, tipo, datetime.now().isoformat(), meta, foto),
     )
     db.commit()
-    flash("Investimento cadastrado!", "success")
-    return redirect(url_for("investimentos"))
+    flash(f"Caixinha \"{nome}\" criada!", "success")
+    return redirect(url_for("caixinha", iid=cur.lastrowid))
 
 
-@app.route("/investimentos/<int:iid>/desativar", methods=["POST"])
+@app.route("/caixinhas/<int:iid>")
+@login_required
+def caixinha(iid):
+    db = get_db()
+    cx = next((c for c in listar_caixinhas(db) if c["id"] == iid), None)
+    if not cx:
+        flash("Caixinha não encontrada.", "error")
+        return redirect(url_for("investimentos"))
+    movimentos = db.execute(
+        """SELECT t.*, u.display_name nome FROM transactions t JOIN users u ON u.id = t.user_id
+           WHERE t.investimento_id = ? ORDER BY t.data DESC, t.id DESC""",
+        (iid,),
+    ).fetchall()
+    return render_template(
+        "caixinha.html", cx=cx, movimentos=movimentos, tipos=TIPOS_INVESTIMENTO, today=date.today().isoformat()
+    )
+
+
+@app.route("/caixinhas/<int:iid>/editar", methods=["POST"])
+@login_required
+def editar_caixinha(iid):
+    db = get_db()
+    nome = request.form.get("nome", "").strip()
+    if not nome:
+        flash("Dê um nome para a caixinha.", "error")
+        return redirect(url_for("caixinha", iid=iid))
+    try:
+        meta = _ler_meta(request.form.get("meta"))
+    except ValueError:
+        flash("Meta inválida. Use algo como 5.000,00.", "error")
+        return redirect(url_for("caixinha", iid=iid))
+    db.execute(
+        "UPDATE investimentos SET nome = ?, tipo = ?, meta = ? WHERE id = ?",
+        (nome, request.form.get("tipo", "Outro"), meta, iid),
+    )
+    foto = save_sonho(request.files.get("foto"))
+    if foto:
+        db.execute("UPDATE investimentos SET foto = ? WHERE id = ?", (foto, iid))
+    db.commit()
+    flash("Caixinha atualizada!", "success")
+    return redirect(url_for("caixinha", iid=iid))
+
+
+@app.route("/caixinhas/<int:iid>/desativar", methods=["POST"])
 @login_required
 def desativar_investimento(iid):
     db = get_db()
+    saldo = saldo_caixinha(db, iid)
+    if round(saldo, 2) != 0:
+        flash(f"Essa caixinha ainda tem {formatar_brl(saldo)}. Resgate o valor antes de apagar.", "error")
+        return redirect(url_for("caixinha", iid=iid))
     db.execute("UPDATE investimentos SET ativo = 0 WHERE id = ?", (iid,))
     db.commit()
-    flash("Investimento removido da lista (histórico mantido).", "success")
+    flash("Caixinha apagada (o histórico de movimentações é mantido).", "success")
     return redirect(url_for("investimentos"))
 
 
-@app.route("/investimentos/movimento", methods=["POST"])
+@app.route("/caixinhas/movimento", methods=["POST"])
 @login_required
 def movimento_investimento():
     db = get_db()
-    investimento_id = request.form.get("investimento_id") or None
-    acao = request.form["acao"]  # deposito | resgate
+    try:
+        iid = int(request.form.get("investimento_id", ""))
+    except ValueError:
+        flash("Escolha uma caixinha.", "error")
+        return redirect(url_for("investimentos"))
+    cx = db.execute("SELECT * FROM investimentos WHERE id = ? AND ativo = 1", (iid,)).fetchone()
+    if not cx:
+        flash("Caixinha não encontrada.", "error")
+        return redirect(url_for("investimentos"))
+    acao = request.form.get("acao")  # deposito | resgate
     tipo = "investimento_deposito" if acao == "deposito" else "investimento_resgate"
     try:
         valor = parse_valor_brl(request.form["valor"])
-    except ValueError:
-        flash("Valor inválido.", "error")
-        return redirect(url_for("investimentos"))
-    data_str = request.form["data"]
-    descricao = request.form.get("descricao", "").strip() or ("Aporte" if acao == "deposito" else "Resgate")
+    except (ValueError, KeyError):
+        flash("Valor inválido. Use algo como 150,50.", "error")
+        return redirect(url_for("caixinha", iid=iid))
+    if valor <= 0:
+        flash("O valor precisa ser maior que zero.", "error")
+        return redirect(url_for("caixinha", iid=iid))
+    if tipo == "investimento_resgate" and valor > saldo_caixinha(db, iid) + 0.005:
+        flash(f"A caixinha só tem {formatar_brl(saldo_caixinha(db, iid))} para resgatar.", "error")
+        return redirect(url_for("caixinha", iid=iid))
+    data_str = request.form.get("data") or date.today().isoformat()
+    descricao = request.form.get("descricao", "").strip() or (
+        f"Guardado em {cx['nome']}" if acao == "deposito" else f"Resgate de {cx['nome']}"
+    )
     db.execute(
         """INSERT INTO transactions (user_id, tipo, valor, data, descricao, categoria, origem, investimento_id, criado_em)
            VALUES (?,?,?,?,?, 'Investimento', 'manual', ?, ?)""",
-        (session["user_id"], tipo, valor, data_str, descricao, investimento_id, datetime.now().isoformat()),
+        (session["user_id"], tipo, valor, data_str, descricao, iid, datetime.now().isoformat()),
     )
     db.commit()
-    flash("Movimentação registrada!", "success")
-    return redirect(url_for("investimentos"))
-
-
-# ---------------------------------------------------------------------------
-# Mural de sonhos (opcional, dentro de Investimentos)
-# ---------------------------------------------------------------------------
-
-@app.route("/sonhos")
-@login_required
-def sonhos():
-    db = get_db()
-    fotos = db.execute(
-        """SELECT s.*, u.display_name nome FROM sonhos s JOIN users u ON u.id = s.user_id ORDER BY s.id DESC"""
-    ).fetchall()
-    return render_template("dreams.html", fotos=fotos)
-
-
-@app.route("/sonhos/nova", methods=["POST"])
-@login_required
-def nova_sonho():
-    db = get_db()
-    fname = save_sonho(request.files.get("foto"))
-    if not fname:
-        flash("Envie uma imagem válida (jpg, png, webp ou gif).", "error")
-        return redirect(url_for("sonhos"))
-    legenda = request.form.get("legenda", "").strip()
-    db.execute(
-        "INSERT INTO sonhos (filename, legenda, user_id, criado_em) VALUES (?,?,?,?)",
-        (fname, legenda, session["user_id"], datetime.now().isoformat()),
-    )
-    db.commit()
-    flash("Foto adicionada ao mural de sonhos!", "success")
-    return redirect(url_for("sonhos"))
-
-
-@app.route("/sonhos/<int:sid>/excluir", methods=["POST"])
-@login_required
-def excluir_sonho(sid):
-    db = get_db()
-    db.execute("DELETE FROM sonhos WHERE id = ?", (sid,))
-    db.commit()
-    flash("Foto removida.", "success")
-    return redirect(url_for("sonhos"))
+    flash(f"{formatar_brl(valor)} {'guardado' if acao == 'deposito' else 'resgatado'}!", "success")
+    return redirect(url_for("caixinha", iid=iid))
 
 
 # ---------------------------------------------------------------------------
@@ -1056,15 +1213,7 @@ def excluir_sonho(sid):
 def previsao():
     db = get_db()
     today = date.today()
-    y, m = today.year, today.month
-    ms = []
-    for i in range(5, -1, -1):
-        mm = m - i
-        yy = y
-        while mm <= 0:
-            mm += 12
-            yy -= 1
-        ms.append((yy, mm))
+    ms = ultimos_meses(6, today)
 
     labels, planejado_gastos, planejado_ganhos, real_gastos, real_ganhos = [], [], [], [], []
     linhas_form = []
@@ -1077,12 +1226,12 @@ def previsao():
         pgan = prev["planejado_ganhos"] if prev else 0
         rg = db.execute("SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo='saida' AND data>=? AND data<?", (ini, fim)).fetchone()["t"]
         rga = db.execute("SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo='entrada' AND data>=? AND data<?", (ini, fim)).fetchone()["t"]
-        labels.append(f"{mm:02d}/{yy}")
+        labels.append(f"{MESES_CURTOS[mm - 1]}/{str(yy)[2:]}")
         planejado_gastos.append(round(pg, 2))
         planejado_ganhos.append(round(pgan, 2))
         real_gastos.append(round(rg, 2))
         real_ganhos.append(round(rga, 2))
-        linhas_form.append({"competencia": comp, "label": f"{mm:02d}/{yy}", "planejado_gastos": pg, "planejado_ganhos": pgan})
+        linhas_form.append({"competencia": comp, "label": f"{MESES[mm - 1].capitalize()} {yy}", "planejado_gastos": pg, "planejado_ganhos": pgan})
 
     return render_template(
         "forecast.html",

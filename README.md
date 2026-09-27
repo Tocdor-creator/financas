@@ -17,8 +17,12 @@ App local (roda no seu computador, no navegador) para você e sua esposa organiz
 
 Sempre que quiser usar o app:
 
+No VS Code: abra a pasta do projeto e aperte **F5**.
+
+Ou no terminal, dentro da pasta:
+
 ```
-python app.py
+.venv\Scripts\python app.py
 ```
 
 Vai aparecer uma mensagem tipo `Neste computador: http://127.0.0.1:5000`. Abra esse endereço no seu navegador.
@@ -30,12 +34,11 @@ Para parar o servidor, volte ao terminal e aperte `CTRL + C`.
 ## O que o app faz
 
 - **Login separado** — cada lançamento fica registrado com o nome de quem colocou. Limite de 5 tentativas erradas de senha (bloqueio de 15 minutos) para segurança.
-- **Dashboard** — saldo do mês, gastos por categoria, evolução dos últimos 6 meses (entradas, saídas e investimentos), gasto por pessoa, comparativo de despesas fixas x entradas, e alertas de contas fixas vencidas ou a vencer nos próximos 7 dias.
-- **Lançamentos** — Entradas e Saídas, com categoria livre e comprovante opcional (PDF, JPG, PNG, WEBP).
+- **Início (estilo app de banco)** — saldo do mês com quanto vai sobrar ou faltar depois das contas a pagar, atalhos rápidos (Entrada, Saída, Pagar, Guardar, Importar), contas do mês com botão de pagar, caixinhas, últimos lançamentos, gastos por categoria e por pessoa e evolução dos últimos 6 meses. O botão de olho no topo esconde os valores.
+- **Extrato** — entradas, saídas e movimentos das caixinhas, agrupados por dia e navegáveis mês a mês, com categoria e comprovante opcional (PDF, JPG, PNG, WEBP).
 - **Contas Fixas** — cadastre uma vez (ex: Água, Luz, Aluguel), com dia de vencimento e responsável pelo pagamento (ex: "Água — Kauany", "Luz — Bruno", "Casa — Ambos"). Todo mês ela reaparece pronta para marcar como paga; ao confirmar, vira uma saída automaticamente com a data do pagamento, e você pode anexar o comprovante.
-- **Investimentos** — cadastre instrumentos com nome próprio (ex: "Reserva CDI 100%", "Tesouro Selic"), lance aportes e resgates, veja o total por instrumento e a evolução no dashboard. Mostra também a taxa Selic e CDI do dia (via API pública do Banco Central, quando há internet).
+- **Caixinhas** — dinheiro guardado para cada objetivo (viagem, reserva, carro…), com foto, meta opcional e barra de progresso. Guardar e resgatar a qualquer momento; mostra também a Selic e o CDI ao ano (via API pública do Banco Central, quando há internet).
 - **Previsão x Realizado** — defina quanto vocês planejam gastar/ganhar por mês e compare com o que realmente aconteceu, num gráfico de 4 linhas (Gastos Planejados, Gastos Reais, Ganhos Planejados, Ganhos Reais).
-- **Mural de sonhos** (dentro de Investimentos) — um painel de fotos opcional para guardar imagens do que vocês estão juntando dinheiro para conquistar.
 - **Perfil** — cada pessoa pode trocar a própria senha e escolher sua paleta de cores e fundo da tela (branco, gradiente rosa, azul, lilás ou verde) — só muda a aparência para quem escolheu.
 - **Importar PDF** — extrato ou fatura, com tela de revisão antes de salvar e aprendizado automático de categoria (ex: uma vez marcado "Supermercado XYZ" como Mercado, da próxima vez ele já vem sugerido).
 - **Backup** — na tela de Perfil, um botão para baixar uma cópia do banco de dados (financas.db) a qualquer momento.
@@ -70,7 +73,7 @@ Qualquer uma dessas eu ajudo a configurar quando vocês decidirem qual seguir. A
 
 ## Onde ficam os dados
 
-Tudo fica salvo localmente: lançamentos no arquivo `financas.db` (SQLite), comprovantes na pasta `comprovantes/`, fotos do mural de sonhos na pasta `sonhos/` — todos dentro desta mesma pasta do app, nada vai para a internet a menos que vocês decidam hospedar em algum serviço. Vale a pena, de vez em quando, usar o botão de backup na tela de Perfil (ou copiar essas pastas/arquivo manualmente) para um lugar seguro.
+Tudo fica salvo localmente: lançamentos no arquivo `financas.db` (SQLite), comprovantes na pasta `comprovantes/`, fotos das caixinhas na pasta `sonhos/` — todos dentro desta mesma pasta do app, nada vai para a internet a menos que vocês decidam hospedar em algum serviço. Vale a pena, de vez em quando, usar o botão de backup na tela de Perfil (ou copiar essas pastas/arquivo manualmente) para um lugar seguro.
 
 ## Próximos passos possíveis (se quiser evoluir depois)
 

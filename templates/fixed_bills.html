@@ -1,98 +1,115 @@
 {% extends "base.html" %}
-{% block title %}Contas Fixas{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}Contas{% endblock %}
+{% block page_title %}Contas de {{ mes_label|lower }}{% endblock %}
+
 {% block content %}
-<div class="page-header">
-  <h1>Contas Fixas — {{ competencia }}</h1>
+<div class="card">
+  <div class="rotulo">Falta pagar</div>
+  <div class="saldo-valor money {{ 'neg' if a_pagar > 0 }}">{{ a_pagar|brl }}</div>
+  {% if contas %}
+    <div class="rotulo" style="margin:6px 0">{{ contas_pagas }} de {{ contas|length }} pagas · já pago <span class="money">{{ pago|brl }}</span></div>
+    <div class="barra verde"><span style="width: {{ (contas_pagas / contas|length * 100)|round }}%"></span></div>
+  {% endif %}
 </div>
 
-<table class="full-table">
-  <thead>
-    <tr><th></th><th>Conta</th><th>Vencimento</th><th>Responsável</th><th>Valor</th><th>Status</th><th>Comprovante</th><th></th></tr>
-  </thead>
-  <tbody>
-    {% for r in rows %}
-    <tr class="{{ 'row-paid' if r.status == 'pago' }}">
-      <td>
-        {% if r.status == 'pago' %}
-          <span class="check-ok">✔</span>
+<div class="card">
+  {% for c in contas %}
+    {% if loop.first or (c.status == 'pago') != (loop.previtem.status == 'pago') %}
+      <div class="dia-titulo">{{ 'Pagas' if c.status == 'pago' else 'A pagar' }}</div>
+      <ul class="lista">
+    {% endif %}
+    <li class="item">
+      <div class="item-icone {{ 'entrada' if c.status == 'pago' }}">
+        {% if c.status == 'pago' %}{{ icon('check', 20) }}{% else %}{{ c.categoria_padrao|cat_icon }}{% endif %}
+      </div>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ c.descricao }}</div>
+        <div class="item-sub">
+          <span class="selo selo-{{ c.situacao }}">{{ c.situacao_texto }}</span>
+          {% if c.responsavel %} · {{ c.responsavel }}{% endif %}
+        </div>
+      </div>
+      <div class="item-fim">
+        <span class="item-valor money">{{ c.valor|brl }}</span>
+        {% if c.status == 'pago' %}
+          <div class="item-acoes">
+            {% if c.comprovante %}
+            <a class="btn-icone" href="{{ url_for('ver_comprovante', filename=c.comprovante) }}" target="_blank" title="Ver comprovante">{{ icon('clipe', 18) }}</a>
+            {% endif %}
+            <form class="inline" method="POST" action="{{ url_for('desfazer_pagamento_fixo', pid=c.id) }}" onsubmit="return confirm('Desfazer esse pagamento? A saída correspondente será excluída.');">
+              <button type="submit" class="btn-icone" title="Desfazer pagamento">{{ icon('desfazer', 18) }}</button>
+            </form>
+          </div>
         {% else %}
-          <span class="check-pending">○</span>
+          <a class="btn btn-sm" href="{{ url_for('pagar_conta_fixa', pid=c.id) }}">Pagar</a>
         {% endif %}
-      </td>
-      <td>{{ r.descricao }}</td>
-      <td>dia {{ r.dia_vencimento }}</td>
-      <td>{% if r.responsavel %}<span class="tag tag-resp">{{ r.responsavel }}</span>{% else %}<span class="empty-inline">—</span>{% endif %}</td>
-      <td>R$ {{ "%.2f"|format(r.valor)|replace(".", ",") }}</td>
-      <td>
-        {% if r.status == 'pago' %}
-          <span class="tag tag-green">Pago em {{ r.data_pagamento }}</span>
-        {% else %}
-          <span class="tag tag-amber">Pendente</span>
-        {% endif %}
-      </td>
-      <td>
-        {% if r.comprovante %}
-        <a href="{{ url_for('ver_comprovante', filename=r.comprovante) }}" target="_blank" class="comprovante-link">📎 ver</a>
-        {% else %}
-        <span class="empty-inline">—</span>
-        {% endif %}
-      </td>
-      <td>
-        {% if r.status == 'pago' %}
-          <form method="POST" action="{{ url_for('desfazer_pagamento_fixo', pid=r.id) }}" onsubmit="return confirm('Desfazer esse pagamento? Ele vai sair das saídas.');">
-            <button type="submit" class="btn-secondary btn-sm">Desfazer</button>
-          </form>
-        {% else %}
-          <a href="{{ url_for('pagar_conta_fixa', pid=r.id) }}" class="btn-primary btn-sm">Marcar como pago</a>
-        {% endif %}
-      </td>
-    </tr>
-    {% else %}
-    <tr><td colspan="8" class="empty">Nenhuma conta fixa cadastrada ainda. Adicione uma abaixo.</td></tr>
-    {% endfor %}
-  </tbody>
-</table>
+      </div>
+    </li>
+    {% if loop.last or (c.status == 'pago') != (loop.nextitem.status == 'pago') %}</ul>{% endif %}
+  {% else %}
+    <div class="vazio"><span class="emoji">🧾</span>Nenhuma conta fixa ainda. Cadastre a primeira abaixo: ela vai aparecer aqui todo mês, pronta para pagar.</div>
+  {% endfor %}
+</div>
 
-<div class="form-box">
-  <h3>Nova conta fixa</h3>
-  <p class="hint">Ex: Água, Luz, Internet, Aluguel. Ela vai aparecer todo mês automaticamente aqui, pronta pra marcar como paga.</p>
-  <form method="POST" action="{{ url_for('nova_conta_fixa') }}" class="inline-form">
-    <input type="text" name="descricao" placeholder="Descrição (ex: Água)" required>
-    <input type="text" name="valor" placeholder="Valor R$" required inputmode="decimal">
-    <input type="number" name="dia_vencimento" placeholder="Dia venc. (1-31)" min="1" max="31" required style="width:150px">
-    <input type="text" name="categoria" list="categorias-list" placeholder="Categoria (ex: Moradia)">
-    <datalist id="categorias-list">
-      {% for c in categorias %}<option value="{{ c }}">{% endfor %}
-    </datalist>
-    <input type="text" name="responsavel" list="responsavel-list" placeholder="Responsável (ex: Kauany)">
-    <datalist id="responsavel-list">
-      {% for u in usuarios %}<option value="{{ u.display_name }}">{% endfor %}
-      <option value="Ambos">
-    </datalist>
-    <button type="submit" class="btn-primary">Adicionar</button>
+<details class="card recolher" id="nova" {{ 'open' if not contas }}>
+  <summary>{{ icon('mais-simples', 20) }} Nova conta fixa</summary>
+  <form method="POST" action="{{ url_for('nova_conta_fixa') }}">
+    <div class="campo">
+      <label for="cf-desc">Nome da conta</label>
+      <input id="cf-desc" type="text" name="descricao" placeholder="ex: Água, Luz, Aluguel" required>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="cf-valor">Valor (R$)</label>
+        <input id="cf-valor" type="text" name="valor" placeholder="0,00" required inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="cf-dia">Dia do vencimento</label>
+        <input id="cf-dia" type="number" name="dia_vencimento" placeholder="1 a 31" min="1" max="31" required>
+      </div>
+    </div>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="cf-cat">Categoria</label>
+        <input id="cf-cat" type="text" name="categoria" list="categorias-list" placeholder="ex: Moradia">
+        <datalist id="categorias-list">
+          {% for c in categorias %}<option value="{{ c }}">{% endfor %}
+        </datalist>
+      </div>
+      <div class="campo">
+        <label for="cf-resp">Quem paga</label>
+        <input id="cf-resp" type="text" name="responsavel" list="responsavel-list" placeholder="ex: Ambos">
+        <datalist id="responsavel-list">
+          {% for u in usuarios %}<option value="{{ u.display_name }}">{% endfor %}
+          <option value="Ambos">
+        </datalist>
+      </div>
+    </div>
+    <button type="submit" class="btn btn-bloco">Adicionar conta</button>
   </form>
-</div>
+</details>
 
 {% if todas %}
-<div class="form-box">
-  <h3>Todas as contas fixas cadastradas</h3>
-  <table class="mini-table">
-    <tbody>
+<details class="card recolher">
+  <summary>{{ icon('mais-simples', 20) }} Gerenciar contas cadastradas ({{ todas|length }})</summary>
+  <ul class="lista">
     {% for c in todas %}
-      <tr>
-        <td>{{ c.descricao }}</td>
-        <td>dia {{ c.dia_vencimento }}</td>
-        <td>{{ c.responsavel or '—' }}</td>
-        <td>R$ {{ "%.2f"|format(c.valor)|replace(".", ",") }}</td>
-        <td>
-          <form method="POST" action="{{ url_for('desativar_conta_fixa', cid=c.id) }}" onsubmit="return confirm('Remover essa conta fixa da lista mensal? O histórico de pagamentos anteriores continua salvo.');">
-            <button type="submit" class="btn-delete">🗑</button>
-          </form>
-        </td>
-      </tr>
+    <li class="item">
+      <div class="item-icone">{{ c.categoria|cat_icon }}</div>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ c.descricao }}</div>
+        <div class="item-sub">Todo dia {{ c.dia_vencimento }}{% if c.responsavel %} · {{ c.responsavel }}{% endif %}</div>
+      </div>
+      <div class="item-fim">
+        <span class="item-valor money">{{ c.valor|brl }}</span>
+      </div>
+      <form class="inline" method="POST" action="{{ url_for('desativar_conta_fixa', cid=c.id) }}" onsubmit="return confirm('Remover “{{ c.descricao }}” das contas mensais? Os pagamentos já feitos continuam no histórico.');">
+        <button type="submit" class="btn-icone perigo" title="Remover">{{ icon('lixo', 18) }}</button>
+      </form>
+    </li>
     {% endfor %}
-    </tbody>
-  </table>
-</div>
+  </ul>
+</details>
 {% endif %}
 {% endblock %}

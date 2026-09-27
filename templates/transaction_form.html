@@ -1,31 +1,44 @@
 {% extends "base.html" %}
-{% block title %}Novo lançamento{% endblock %}
+{% from "_icons.html" import icon %}
+{% block title %}{{ 'Nova entrada' if tipo == 'entrada' else 'Nova saída' }}{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('transacoes') }}" aria-label="Voltar">{{ icon('seta-esq', 26) }}</a>{% endblock %}
+
 {% block content %}
-<div class="form-box">
-  <h1>{{ 'Nova entrada' if tipo == 'entrada' else 'Nova saída' }}</h1>
+<div class="card">
   <form method="POST" enctype="multipart/form-data">
     <input type="hidden" name="tipo" value="{{ tipo }}">
-    <label>Descrição</label>
-    <input type="text" name="descricao" placeholder="ex: Supermercado XYZ" required autofocus>
 
-    <label>Valor (R$)</label>
-    <input type="text" name="valor" placeholder="0,00" required inputmode="decimal">
+    <div class="valor-grande">
+      <label for="valor">{{ 'Quanto entrou?' if tipo == 'entrada' else 'Quanto saiu?' }}</label>
+      <div class="caixa"><span>R$</span><input id="valor" type="text" name="valor" placeholder="0,00" required inputmode="decimal" autocomplete="off" autofocus></div>
+    </div>
 
-    <label>Data</label>
-    <input type="date" name="data" value="{{ today }}" required>
+    <div class="campo">
+      <label for="descricao">Descrição</label>
+      <input id="descricao" type="text" name="descricao" placeholder="{{ 'ex: Salário' if tipo == 'entrada' else 'ex: Supermercado XYZ' }}" required>
+    </div>
 
-    <label>Categoria</label>
-    <input type="text" name="categoria" list="categorias-list" placeholder="ex: Mercado">
-    <datalist id="categorias-list">
-      {% for c in categorias %}<option value="{{ c }}">{% endfor %}
-    </datalist>
-    <p class="hint">Se você marcar uma categoria, o sistema vai lembrar dela para descrições parecidas da próxima vez.</p>
+    <div class="campos-2">
+      <div class="campo">
+        <label for="data">Data</label>
+        <input id="data" type="date" name="data" value="{{ today }}" required>
+      </div>
+      <div class="campo">
+        <label for="categoria">Categoria</label>
+        <input id="categoria" type="text" name="categoria" list="categorias-list" placeholder="{{ 'ex: Salário' if tipo == 'entrada' else 'ex: Mercado' }}">
+        <datalist id="categorias-list">
+          {% for c in categorias %}<option value="{{ c }}">{% endfor %}
+        </datalist>
+      </div>
+    </div>
+    <p class="dica">O app lembra a categoria de descrições parecidas nas próximas vezes.</p>
 
-    <label>Comprovante (opcional)</label>
-    <input type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
-    <p class="hint">Aceita PDF, JPG, PNG ou WEBP.</p>
+    <div class="campo">
+      <label for="comprovante">Comprovante (opcional)</label>
+      <input id="comprovante" type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
+    </div>
 
-    <button type="submit" class="btn-primary">Salvar</button>
+    <button type="submit" class="btn btn-bloco">Salvar {{ 'entrada' if tipo == 'entrada' else 'saída' }}</button>
   </form>
 </div>
 {% endblock %}
