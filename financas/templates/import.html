@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Importar PDF{% endblock %}
+{% block content %}
+<div class="form-box">
+  <h1>Importar extrato ou fatura (PDF)</h1>
+  <p class="subtitle">Envie o PDF do extrato bancário ou da fatura do cartão. Depois você revisa e confirma cada lançamento antes de salvar.</p>
+  <form method="POST" enctype="multipart/form-data">
+    <label>Arquivo PDF</label>
+    <input type="file" name="pdf" accept="application/pdf" required>
+    <button type="submit" class="btn-primary">Analisar PDF</button>
+  </form>
+  <p class="hint">Dica: PDFs de bancos variam muito de formato. O sistema tenta reconhecer as linhas automaticamente — o que não for identificado corretamente você pode corrigir na tela seguinte, ou lançar manualmente.</p>
+</div>
+{% endblock %}

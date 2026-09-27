@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Configuração inicial{% endblock %}
+{% block content %}
+<div class="auth-box">
+  <h1>Bem-vindos! 👋</h1>
+  <p class="subtitle">Vamos criar as duas contas antes de começar.</p>
+  <form method="POST" class="setup-form">
+    <div class="setup-pair">
+      <fieldset>
+        <legend>Pessoa 1</legend>
+        <label>Nome de exibição</label>
+        <input type="text" name="display1" placeholder="ex: João" required>
+        <label>Usuário (login)</label>
+        <input type="text" name="username1" placeholder="ex: joao" required>
+        <label>Senha</label>
+        <input type="password" name="password1" required>
+      </fieldset>
+      <fieldset>
+        <legend>Pessoa 2</legend>
+        <label>Nome de exibição</label>
+        <input type="text" name="display2" placeholder="ex: Maria" required>
+        <label>Usuário (login)</label>
+        <input type="text" name="username2" placeholder="ex: maria" required>
+        <label>Senha</label>
+        <input type="password" name="password2" required>
+      </fieldset>
+    </div>
+    <button type="submit" class="btn-primary">Criar contas</button>
+  </form>
+</div>
+{% endblock %}

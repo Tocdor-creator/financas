@@ -1,0 +1,47 @@
+{% extends "base.html" %}
+{% block title %}Futuro{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Futuro (Poupança)</h1>
+</div>
+
+<div class="cards-row">
+  <div class="card wide">
+    <div class="card-label">Total guardado</div>
+    <div class="card-value future">R$ {{ "%.2f"|format(total)|replace(".", ",") }}</div>
+  </div>
+</div>
+
+<div class="form-box">
+  <h3>Nova movimentação</h3>
+  <form method="POST" action="{{ url_for('nova_futuro') }}" class="inline-form">
+    <select name="acao" required>
+      <option value="deposito">Depósito (guardar)</option>
+      <option value="resgate">Resgate (usar)</option>
+    </select>
+    <input type="text" name="valor" placeholder="Valor R$" required inputmode="decimal">
+    <input type="date" name="data" value="{{ today }}" required>
+    <input type="text" name="descricao" placeholder="Descrição (opcional)">
+    <button type="submit" class="btn-primary">Salvar</button>
+  </form>
+</div>
+
+<table class="full-table">
+  <thead><tr><th>Data</th><th>Tipo</th><th>Descrição</th><th>Quem</th><th>Valor</th></tr></thead>
+  <tbody>
+    {% for t in rows %}
+    <tr>
+      <td>{{ t.data }}</td>
+      <td>{{ 'Depósito' if t.tipo=='futuro_deposito' else 'Resgate' }}</td>
+      <td>{{ t.descricao }}</td>
+      <td>{{ t.nome }}</td>
+      <td class="{{ 'positive' if t.tipo=='futuro_deposito' else 'negative' }}">
+        {{ '+' if t.tipo=='futuro_deposito' else '-' }}R$ {{ "%.2f"|format(t.valor)|replace(".", ",") }}
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5" class="empty">Nenhuma movimentação ainda.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

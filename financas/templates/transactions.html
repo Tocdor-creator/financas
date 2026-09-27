@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% block title %}Lançamentos{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Lançamentos</h1>
+  <div class="header-actions">
+    <a href="{{ url_for('nova_transacao', tipo='entrada') }}" class="btn-primary">+ Entrada</a>
+    <a href="{{ url_for('nova_transacao', tipo='saida') }}" class="btn-secondary">+ Saída</a>
+  </div>
+</div>
+
+<div class="filter-tabs">
+  <a href="{{ url_for('transacoes') }}" class="{{ 'active' if not tipo_filter }}">Todos</a>
+  <a href="{{ url_for('transacoes', tipo='entrada') }}" class="{{ 'active' if tipo_filter=='entrada' }}">Entradas</a>
+  <a href="{{ url_for('transacoes', tipo='saida') }}" class="{{ 'active' if tipo_filter=='saida' }}">Saídas</a>
+</div>
+
+<table class="full-table">
+  <thead>
+    <tr><th>Data</th><th>Descrição</th><th>Categoria</th><th>Quem</th><th>Valor</th><th>Origem</th><th></th></tr>
+  </thead>
+  <tbody>
+    {% for t in rows %}
+    <tr>
+      <td>{{ t.data }}</td>
+      <td>{{ t.descricao }}</td>
+      <td><span class="tag">{{ t.categoria or '—' }}</span></td>
+      <td>{{ t.nome }}</td>
+      <td class="{{ 'positive' if t.tipo=='entrada' else 'negative' }}">
+        {{ '+' if t.tipo=='entrada' else '-' }}R$ {{ "%.2f"|format(t.valor)|replace(".", ",") }}
+      </td>
+      <td>
+        <span class="badge">{{ {'pdf':'PDF','conta_fixa':'Conta fixa'}.get(t.origem, 'Manual') }}</span>
+        {% if t.comprovante %}
+        <a href="{{ url_for('ver_comprovante', filename=t.comprovante) }}" target="_blank" class="comprovante-link" title="Ver comprovante">📎</a>
+        {% endif %}
+      </td>
+      <td>
+        <form method="POST" action="{{ url_for('excluir_transacao', tid=t.id) }}" onsubmit="return confirm('Excluir este lançamento?');">
+          <button type="submit" class="btn-delete">🗑</button>
+        </form>
+      </td>
+    </tr>
+    {% else %}
+    <tr><td colspan="7" class="empty">Nenhum lançamento encontrado.</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

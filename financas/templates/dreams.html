@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% block title %}Mural de sonhos{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>📷 Mural de sonhos</h1>
+  <a href="{{ url_for('investimentos') }}" class="btn-secondary">← Voltar para Investimentos</a>
+</div>
+<p class="subtitle">Guarde fotos daquilo que vocês estão juntando dinheiro pra conquistar — uma viagem, uma casa, um carro, o que for.</p>
+
+<div class="form-box">
+  <form method="POST" action="{{ url_for('nova_sonho') }}" enctype="multipart/form-data" class="inline-form">
+    <input type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif" required>
+    <input type="text" name="legenda" placeholder="Legenda (ex: Viagem para o Chile)">
+    <button type="submit" class="btn-primary">Adicionar</button>
+  </form>
+</div>
+
+<div class="dreams-grid">
+  {% for f in fotos %}
+  <div class="dream-card">
+    <img src="{{ url_for('ver_sonho_foto', filename=f.filename) }}" alt="{{ f.legenda }}">
+    <div class="dream-caption">
+      <span>{{ f.legenda or 'Sem legenda' }}</span>
+      <form method="POST" action="{{ url_for('excluir_sonho', sid=f.id) }}" onsubmit="return confirm('Remover essa foto do mural?');">
+        <button type="submit" class="btn-delete">🗑</button>
+      </form>
+    </div>
+  </div>
+  {% else %}
+  <p class="empty">Nenhuma foto no mural ainda. Adicione a primeira acima!</p>
+  {% endfor %}
+</div>
+{% endblock %}

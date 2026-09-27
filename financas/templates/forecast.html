@@ -1,0 +1,56 @@
+{% extends "base.html" %}
+{% block title %}Previsão x Realizado{% endblock %}
+{% block content %}
+<div class="page-header">
+  <h1>Previsão x Realizado</h1>
+</div>
+<p class="subtitle">Defina quanto vocês planejam gastar e ganhar em cada mês, e compare com o que realmente aconteceu.</p>
+
+<div class="chart-box" style="margin-bottom:24px;">
+  <canvas id="chartPrevisao"></canvas>
+</div>
+
+<div class="form-box">
+  <h3>Editar previsões por mês</h3>
+  <form method="POST" action="{{ url_for('salvar_previsao') }}">
+    <input type="hidden" name="total" value="{{ linhas_form|length }}">
+    <table class="full-table review-table">
+      <thead>
+        <tr><th>Mês</th><th>Gastos planejados (R$)</th><th>Ganhos planejados (R$)</th></tr>
+      </thead>
+      <tbody>
+        {% for l in linhas_form %}
+        <tr>
+          <td>{{ l.label }}</td>
+          <td>
+            <input type="hidden" name="competencia_{{ loop.index0 }}" value="{{ l.competencia }}">
+            <input type="text" name="planejado_gastos_{{ loop.index0 }}" value="{{ '%.2f'|format(l.planejado_gastos)|replace('.', ',') }}" class="valor-input" inputmode="decimal">
+          </td>
+          <td>
+            <input type="text" name="planejado_ganhos_{{ loop.index0 }}" value="{{ '%.2f'|format(l.planejado_ganhos)|replace('.', ',') }}" class="valor-input" inputmode="decimal">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    <button type="submit" class="btn-primary">Salvar previsões</button>
+  </form>
+</div>
+
+<script src="{{ url_for('static', filename='js/chart.js') }}"></script>
+<script>
+new Chart(document.getElementById('chartPrevisao'), {
+  type: 'line',
+  data: {
+    labels: {{ labels|safe }},
+    datasets: [
+      { label: 'Gastos Planejados', data: {{ planejado_gastos|safe }}, borderColor: '#e17055', borderDash: [6,4], fill: false, tension: 0.25 },
+      { label: 'Gastos Reais', data: {{ real_gastos|safe }}, borderColor: '#e17055', fill: false, tension: 0.25 },
+      { label: 'Ganhos Planejados', data: {{ planejado_ganhos|safe }}, borderColor: '{{ tema.secondary }}', borderDash: [6,4], fill: false, tension: 0.25 },
+      { label: 'Ganhos Reais', data: {{ real_ganhos|safe }}, borderColor: '{{ tema.secondary }}', fill: false, tension: 0.25 }
+    ]
+  },
+  options: { plugins: { legend: { position: 'bottom' } }, scales: { y: { beginAtZero: true } } }
+});
+</script>
+{% endblock %}

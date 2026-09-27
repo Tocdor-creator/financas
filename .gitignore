@@ -1,0 +1,13 @@
+# dados pessoais — não versionar
+financas.db
+financas.db-*
+secret.key
+comprovantes/
+sonhos/
+_tmp_import_*.pdf
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/

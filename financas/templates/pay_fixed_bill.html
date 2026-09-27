@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Marcar como pago{% endblock %}
+{% block content %}
+<div class="form-box">
+  <h1>Marcar "{{ pagamento.descricao }}" como pago</h1>
+  <p class="subtitle">Isso vai criar automaticamente um lançamento em Saídas com a data de pagamento.
+  {% if pagamento.responsavel %}Responsável: <strong>{{ pagamento.responsavel }}</strong>.{% endif %}</p>
+  <form method="POST" enctype="multipart/form-data">
+    <label>Valor pago (R$)</label>
+    <input type="text" name="valor" value="{{ '%.2f'|format(pagamento.valor)|replace('.', ',') }}" required inputmode="decimal">
+
+    <label>Data do pagamento</label>
+    <input type="date" name="data_pagamento" value="{{ today }}" required>
+
+    <label>Categoria</label>
+    <input type="text" name="categoria" list="categorias-list" value="{{ pagamento.categoria_padrao or '' }}">
+    <datalist id="categorias-list">
+      {% for c in categorias %}<option value="{{ c }}">{% endfor %}
+    </datalist>
+
+    <label>Comprovante (opcional)</label>
+    <input type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
+    <p class="hint">Aceita PDF, JPG, PNG ou WEBP. Fica salvo aqui mesmo para você consultar depois.</p>
+
+    <button type="submit" class="btn-primary">Confirmar pagamento</button>
+    <a href="{{ url_for('contas_fixas') }}" class="btn-secondary">Cancelar</a>
+  </form>
+</div>
+{% endblock %}
