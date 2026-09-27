@@ -203,6 +203,18 @@ def init_db():
     # renomeia o antigo tipo "futuro_*" para "investimento_*" (idempotente)
     db.execute("UPDATE transactions SET tipo='investimento_deposito' WHERE tipo='futuro_deposito'")
     db.execute("UPDATE transactions SET tipo='investimento_resgate' WHERE tipo='futuro_resgate'")
+
+    # limpa pendências de contas fixas desativadas antes desta correção (idempotente)
+    db.execute(
+        "DELETE FROM pagamentos_fixos WHERE status='pendente' "
+        "AND conta_fixa_id IN (SELECT id FROM contas_fixas WHERE ativo = 0)"
+    )
+    # pagamentos marcados como pagos cujo lançamento foi excluído voltam a pendente (idempotente)
+    db.execute(
+        "UPDATE pagamentos_fixos SET status='pendente', data_pagamento=NULL, transaction_id=NULL, comprovante=NULL "
+        "WHERE status='pago' AND transaction_id IS NOT NULL "
+        "AND transaction_id NOT IN (SELECT id FROM transactions)"
+    )
     db.commit()
     db.close()
 
@@ -212,8 +224,9 @@ def init_db():
 # ---------------------------------------------------------------------------
 
 def parse_valor_brl(texto: str) -> float:
-    """Converte strings tipo '1.234,56', '1234,56', '1234.56' ou '1234' em float.
-    Lança ValueError se não conseguir interpretar."""
+    """Converte strings tipo '1.234,56', '1234,56', '1.500', '1234.56' ou '1234' em float.
+    Só com ponto, '1.500' / '12.345.678' são milhar (padrão brasileiro); '10.5' é decimal.
+    Lança ValueError se não conseguir interpretar ou se for negativo."""
     if texto is None:
         raise ValueError("valor vazio")
     s = str(texto).strip().replace("R$", "").replace(" ", "")
@@ -223,7 +236,12 @@ def parse_valor_brl(texto: str) -> float:
         s = s.replace(".", "").replace(",", ".")
     elif "," in s:
         s = s.replace(",", ".")
-    return float(s)
+    elif re.fullmatch(r"[1-9]\d{0,2}(?:\.\d{3})+", s):
+        s = s.replace(".", "")
+    valor = float(s)
+    if valor < 0:
+        raise ValueError("valor negativo")
+    return valor
 
 
 def normalize_desc(desc: str) -> str:
@@ -530,17 +548,21 @@ def dashboard():
     db = get_db()
     today = date.today()
     month_start = today.replace(day=1).isoformat()
+    month_end = (today.replace(day=28) + timedelta(days=4)).replace(day=1).isoformat()  # 1º dia do mês seguinte
 
-    def total(tipo, since=None):
+    def total(tipo, since=None, until=None):
         q = "SELECT COALESCE(SUM(valor),0) t FROM transactions WHERE tipo = ?"
         params = [tipo]
         if since:
             q += " AND data >= ?"
             params.append(since)
+        if until:
+            q += " AND data < ?"
+            params.append(until)
         return db.execute(q, params).fetchone()["t"]
 
-    entradas_mes = total("entrada", month_start)
-    saidas_mes = total("saida", month_start)
+    entradas_mes = total("entrada", month_start, month_end)
+    saidas_mes = total("saida", month_start, month_end)
     saldo_mes = entradas_mes - saidas_mes
 
     total_investido = total("investimento_deposito") - total("investimento_resgate")
@@ -548,9 +570,9 @@ def dashboard():
     # gastos por categoria (mês atual)
     cat_rows = db.execute(
         """SELECT COALESCE(categoria,'Outros') categoria, SUM(valor) total
-           FROM transactions WHERE tipo='saida' AND data >= ?
+           FROM transactions WHERE tipo='saida' AND data >= ? AND data < ?
            GROUP BY categoria ORDER BY total DESC""",
-        (month_start,),
+        (month_start, month_end),
     ).fetchall()
     categorias_labels = [r["categoria"] for r in cat_rows]
     categorias_valores = [round(r["total"], 2) for r in cat_rows]
@@ -585,9 +607,9 @@ def dashboard():
     pessoa_rows = db.execute(
         """SELECT u.display_name nome, u.color cor, COALESCE(SUM(t.valor),0) total
            FROM users u LEFT JOIN transactions t
-             ON t.user_id = u.id AND t.tipo='saida' AND t.data >= ?
+             ON t.user_id = u.id AND t.tipo='saida' AND t.data >= ? AND t.data < ?
            GROUP BY u.id""",
-        (month_start,),
+        (month_start, month_end),
     ).fetchall()
 
     ultimas = db.execute(
@@ -688,6 +710,12 @@ def nova_transacao():
 def excluir_transacao(tid):
     db = get_db()
     db.execute("DELETE FROM transactions WHERE id = ?", (tid,))
+    # se era o pagamento de uma conta fixa, a conta volta a ficar pendente
+    db.execute(
+        "UPDATE pagamentos_fixos SET status='pendente', data_pagamento=NULL, transaction_id=NULL, comprovante=NULL "
+        "WHERE transaction_id = ?",
+        (tid,),
+    )
     db.commit()
     flash("Lançamento excluído.", "success")
     return redirect(request.referrer or url_for("dashboard"))
@@ -789,7 +817,11 @@ def nova_conta_fixa():
         return redirect(url_for("contas_fixas"))
     categoria = request.form.get("categoria", "").strip() or None
     responsavel = request.form.get("responsavel", "").strip() or None
-    dia = max(1, min(31, int(request.form["dia_vencimento"])))
+    try:
+        dia = max(1, min(31, int(request.form["dia_vencimento"])))
+    except (ValueError, KeyError):
+        flash("Dia de vencimento inválido. Use um número de 1 a 31.", "error")
+        return redirect(url_for("contas_fixas"))
     db.execute(
         "INSERT INTO contas_fixas (descricao, valor, categoria, responsavel, dia_vencimento, ativo, criado_em) VALUES (?,?,?,?,?,1,?)",
         (descricao, valor, categoria, responsavel, dia, datetime.now().isoformat()),
@@ -804,6 +836,8 @@ def nova_conta_fixa():
 def desativar_conta_fixa(cid):
     db = get_db()
     db.execute("UPDATE contas_fixas SET ativo = 0 WHERE id = ?", (cid,))
+    # pendências em aberto deixam de existir; pagamentos já feitos continuam no histórico
+    db.execute("DELETE FROM pagamentos_fixos WHERE conta_fixa_id = ? AND status = 'pendente'", (cid,))
     db.commit()
     flash("Conta fixa removida da lista (o histórico de pagamentos é mantido).", "success")
     return redirect(url_for("contas_fixas"))
@@ -1117,16 +1151,24 @@ def parse_pdf(filepath):
                 if len(desc) < 3 or re.fullmatch(r"[\d\s./-]+", desc):
                     continue
                 parts = re.split(r"[/.]", data_raw)
-                if len(parts) == 2:
-                    dia, mes = parts
-                    ano = str(date.today().year)
-                else:
-                    dia, mes, ano = parts
-                    if len(ano) == 2:
-                        ano = "20" + ano
                 try:
-                    iso_data = f"{int(ano):04d}-{int(mes):02d}-{int(dia):02d}"
-                    datetime.strptime(iso_data, "%Y-%m-%d")
+                    if len(parts) == 2:
+                        # sem ano: assume o ano atual, mas se a data cair muito no futuro
+                        # (ex: fatura de dezembro importada em janeiro) usa o ano anterior
+                        dia, mes = int(parts[0]), int(parts[1])
+                        hoje = date.today()
+                        try:
+                            d = date(hoje.year, mes, dia)
+                        except ValueError:  # ex: 29/02 em ano não bissexto
+                            d = None
+                        if d is None or d > hoje + timedelta(days=60):
+                            d = date(hoje.year - 1, mes, dia)
+                    else:
+                        dia, mes, ano = parts
+                        if len(ano) == 2:
+                            ano = "20" + ano
+                        d = date(int(ano), int(mes), int(dia))
+                    iso_data = d.isoformat()
                 except ValueError:
                     continue
                 tipo_sugerido = "entrada" if sinal == "+" else "saida"
