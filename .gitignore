@@ -12,3 +12,7 @@ __pycache__/
 .venv/
 venv/
 backups/
+
+# servidor (Termux)
+app.pid
+app.log
