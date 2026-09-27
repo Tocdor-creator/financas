@@ -20,6 +20,7 @@
       <ul class="lista">
     {% endif %}
     <li class="item">
+      {% if c.transaction_id %}<a class="item-cobre" href="{{ url_for('editar_transacao', tid=c.transaction_id, voltar=request.full_path) }}" aria-label="Editar pagamento de {{ c.descricao }}"></a>{% endif %}
       <div class="item-icone {{ 'entrada' if c.status == 'pago' }}">
         {% if c.status == 'pago' %}{{ icon('check', 20) }}{% else %}{{ c.categoria_padrao|cat_icon }}{% endif %}
       </div>

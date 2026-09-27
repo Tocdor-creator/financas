@@ -1,10 +1,12 @@
 {% from "_icons.html" import icon %}
 
-{# Uma linha do extrato. Caixinha: guardar é saída da conta (neutro), resgatar é entrada. #}
-{% macro linha_lancamento(t, mostrar_data=false, excluir=false) -%}
+{# Uma linha do extrato; tocar nela abre a edição. `voltar` é para onde a edição retorna depois de salvar.
+   Caixinha: guardar é saída da conta (neutro), resgatar é entrada. #}
+{% macro linha_lancamento(t, voltar, mostrar_data=false) -%}
 {% set caixinha = t.tipo.startswith('investimento') %}
 {% set entra = t.tipo in ('entrada', 'investimento_resgate') %}
 <li class="item">
+  <a class="item-cobre" href="{{ url_for('editar_transacao', tid=t.id, voltar=voltar) }}" aria-label="Editar {{ t.descricao }}"></a>
   {% if t.tipo == 'entrada' %}
     <div class="item-icone entrada">{{ icon('entrada', 20) }}</div>
   {% elif caixinha %}
@@ -25,18 +27,10 @@
     </div>
   </div>
   <div class="item-fim">
-    <span class="item-valor money {{ 'pos' if t.tipo in ('entrada',) }}">{{ '+' if entra else '−' }}{{ t.valor|brl }}</span>
-    {% if excluir or t.comprovante %}
+    <span class="item-valor money {{ 'pos' if t.tipo == 'entrada' }}">{{ '+' if entra else '−' }}{{ t.valor|brl }}</span>
+    {% if t.comprovante %}
     <div class="item-acoes">
-      {% if t.comprovante %}
       <a class="btn-icone" href="{{ url_for('ver_comprovante', filename=t.comprovante) }}" target="_blank" title="Ver comprovante">{{ icon('clipe', 18) }}</a>
-      {% endif %}
-      {% if excluir %}
-      <form class="inline" method="POST" action="{{ url_for('excluir_transacao', tid=t.id) }}"
-            onsubmit="return confirm('Excluir este lançamento?{{ ' A conta fixa volta a ficar pendente.' if t.origem == 'conta_fixa' }}');">
-        <button type="submit" class="btn-icone perigo" title="Excluir">{{ icon('lixo', 18) }}</button>
-      </form>
-      {% endif %}
     </div>
     {% endif %}
   </div>

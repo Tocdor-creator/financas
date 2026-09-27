@@ -108,7 +108,7 @@
   </div>
   {% if ultimas %}
   <ul class="lista">
-    {% for t in ultimas %}{{ linha_lancamento(t, mostrar_data=true) }}{% endfor %}
+    {% for t in ultimas %}{{ linha_lancamento(t, request.full_path, mostrar_data=true) }}{% endfor %}
   </ul>
   {% else %}
   <div class="vazio"><span class="emoji">📭</span>Nenhum lançamento ainda. Use os atalhos acima para começar.</div>

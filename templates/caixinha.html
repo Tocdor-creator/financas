@@ -53,6 +53,7 @@
   <ul class="lista">
     {% for t in movimentos %}
     <li class="item">
+      <a class="item-cobre" href="{{ url_for('editar_transacao', tid=t.id, voltar=request.full_path) }}" aria-label="Editar {{ t.descricao }}"></a>
       <div class="item-icone {{ 'caixinha' if t.tipo == 'investimento_deposito' }}">{{ '🐷' if t.tipo == 'investimento_deposito' else '💸' }}</div>
       <div class="item-corpo">
         <div class="item-titulo">{{ t.descricao }}</div>
@@ -61,9 +62,6 @@
       <div class="item-fim">
         <span class="item-valor money {{ 'pos' if t.tipo == 'investimento_deposito' }}">{{ '+' if t.tipo == 'investimento_deposito' else '−' }}{{ t.valor|brl }}</span>
       </div>
-      <form class="inline" method="POST" action="{{ url_for('excluir_transacao', tid=t.id) }}" onsubmit="return confirm('Excluir esta movimentação?');">
-        <button type="submit" class="btn-icone perigo" title="Excluir">{{ icon('lixo', 18) }}</button>
-      </form>
     </li>
     {% else %}
     <li class="vazio">Nada guardado ainda. Que tal começar hoje?</li>

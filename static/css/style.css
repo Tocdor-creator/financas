@@ -191,6 +191,12 @@ img { max-width: 100%; display: block; }
   border-bottom: 1px solid var(--linha);
 }
 .item:last-child { border-bottom: 0; }
+/* link que cobre a linha inteira (tocar abre a edição); botões da linha ficam por cima */
+.item { position: relative; }
+.item-cobre { position: absolute; inset: 0; z-index: 1; border-radius: 12px; }
+.item-cobre:focus-visible { outline: 2px solid var(--primary); outline-offset: 2px; }
+.item:has(.item-cobre):hover .item-titulo { color: var(--primary); }
+.item-acoes, .item-fim .btn, .item form { position: relative; z-index: 2; }
 .item-icone {
   flex: none; width: 42px; height: 42px; border-radius: 50%;
   background: var(--chip);
@@ -293,6 +299,18 @@ details.recolher > summary::-webkit-details-marker { display: none; }
 details.recolher > summary .ico { transition: transform .15s ease; }
 details.recolher[open] > summary { margin-bottom: 14px; }
 details.recolher[open] > summary .ico { transform: rotate(45deg); }
+
+.segmento { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; background: var(--chip); border-radius: 999px; padding: 4px; margin-bottom: 8px; }
+.segmento label {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 9px 12px; border-radius: 999px; cursor: pointer;
+  font-weight: 700; font-size: .92rem; color: var(--texto-2);
+}
+.segmento input { position: absolute; opacity: 0; pointer-events: none; }
+.segmento label:has(input:checked) { background: var(--card); color: var(--primary); box-shadow: var(--sombra); }
+.comprovante-atual { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 8px; font-weight: 600; font-size: .92rem; }
+.comprovante-atual a { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.check { display: inline-flex; align-items: center; gap: 6px; color: var(--texto-2); cursor: pointer; }
 
 /* --- abas e navegação de mês ---------------------------------------------------- */
 .abas { display: flex; gap: 8px; overflow-x: auto; margin: 0 0 14px; padding-bottom: 2px; scrollbar-width: none; }

@@ -30,7 +30,7 @@
   {% for dia, itens in dias %}
     <div class="dia-titulo">{{ dia|dia_extenso }}</div>
     <ul class="lista">
-      {% for t in itens %}{{ linha_lancamento(t, excluir=true) }}{% endfor %}
+      {% for t in itens %}{{ linha_lancamento(t, request.full_path) }}{% endfor %}
     </ul>
   {% else %}
     <div class="vazio"><span class="emoji">📭</span>Nenhum lançamento em {{ mes_label|lower }}.</div>

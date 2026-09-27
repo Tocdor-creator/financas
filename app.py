@@ -879,10 +879,106 @@ def nova_transacao():
     return render_template("transaction_form.html", tipo=tipo, categorias=DEFAULT_CATEGORIES, today=date.today().isoformat())
 
 
+def _url_voltar(padrao):
+    """Para onde voltar depois de editar/excluir: só aceita caminhos internos do app."""
+    voltar = request.values.get("voltar", "")
+    return voltar if voltar.startswith("/") and not voltar.startswith("//") else padrao
+
+
+def _efeito_na_caixinha(tipo, valor):
+    return valor if tipo == "investimento_deposito" else -valor
+
+
+@app.route("/transacoes/<int:tid>/editar", methods=["GET", "POST"])
+@login_required
+def editar_transacao(tid):
+    db = get_db()
+    t = db.execute(
+        """SELECT t.*, u.display_name nome, i.nome AS caixinha_nome, c.descricao AS conta_fixa_nome
+           FROM transactions t JOIN users u ON u.id = t.user_id
+           LEFT JOIN investimentos i ON i.id = t.investimento_id
+           LEFT JOIN pagamentos_fixos p ON p.transaction_id = t.id
+           LEFT JOIN contas_fixas c ON c.id = p.conta_fixa_id
+           WHERE t.id = ?""",
+        (tid,),
+    ).fetchone()
+    if not t:
+        flash("Lançamento não encontrado.", "error")
+        return redirect(url_for("transacoes"))
+    caixinha = t["tipo"].startswith("investimento")
+    voltar = _url_voltar(url_for("transacoes", mes=t["data"][:7]))
+
+    if request.method == "POST":
+        erro = None
+        try:
+            valor = parse_valor_brl(request.form.get("valor"))
+            if valor <= 0:
+                raise ValueError("zero")
+        except ValueError:
+            erro = "Valor inválido. Use algo como 150,50."
+        data_str = request.form.get("data", "")
+        try:
+            date.fromisoformat(data_str)
+        except ValueError:
+            erro = erro or "Data inválida."
+        descricao = request.form.get("descricao", "").strip()
+        if not descricao:
+            erro = erro or "A descrição não pode ficar vazia."
+
+        # tipo: caixinha mantém o seu; pagamento de conta fixa é sempre saída; o resto pode trocar
+        tipo = t["tipo"]
+        if not caixinha and t["origem"] != "conta_fixa" and request.form.get("tipo") in ("entrada", "saida"):
+            tipo = request.form["tipo"]
+        categoria = "Investimento" if caixinha else (request.form.get("categoria", "").strip() or None)
+
+        if not erro and caixinha:
+            saldo_novo = (saldo_caixinha(db, t["investimento_id"])
+                          - _efeito_na_caixinha(t["tipo"], t["valor"]) + _efeito_na_caixinha(tipo, valor))
+            if saldo_novo < -0.005:
+                erro = "Com esse valor a caixinha ficaria negativa."
+        if erro:
+            flash(erro, "error")
+            return redirect(url_for("editar_transacao", tid=tid, voltar=voltar))
+
+        comprovante = t["comprovante"]
+        novo_comprovante = save_comprovante(request.files.get("comprovante"))
+        if novo_comprovante:
+            comprovante = novo_comprovante
+        elif request.form.get("remover_comprovante") == "on":
+            comprovante = None
+
+        db.execute(
+            "UPDATE transactions SET tipo=?, valor=?, data=?, descricao=?, categoria=?, comprovante=? WHERE id=?",
+            (tipo, valor, data_str, descricao, categoria, comprovante, tid),
+        )
+        # pagamento de conta fixa: a conta acompanha o valor, a data e o comprovante
+        db.execute(
+            "UPDATE pagamentos_fixos SET valor=?, data_pagamento=?, comprovante=? WHERE transaction_id=?",
+            (valor, data_str, comprovante, tid),
+        )
+        db.commit()
+        if categoria and tipo == "saida":
+            learn_category(descricao, categoria)
+        flash("Lançamento atualizado!", "success")
+        return redirect(voltar)
+
+    return render_template(
+        "transaction_edit.html", t=t, caixinha=caixinha, voltar=voltar, categorias=DEFAULT_CATEGORIES
+    )
+
+
 @app.route("/transacoes/<int:tid>/excluir", methods=["POST"])
 @login_required
 def excluir_transacao(tid):
     db = get_db()
+    t = db.execute("SELECT * FROM transactions WHERE id = ?", (tid,)).fetchone()
+    voltar = _url_voltar(request.referrer or url_for("transacoes"))
+    if not t:
+        flash("Lançamento não encontrado.", "error")
+        return redirect(voltar)
+    if t["tipo"] == "investimento_deposito" and saldo_caixinha(db, t["investimento_id"]) - t["valor"] < -0.005:
+        flash("Não dá para excluir: parte desse dinheiro já foi resgatada e a caixinha ficaria negativa.", "error")
+        return redirect(voltar)
     db.execute("DELETE FROM transactions WHERE id = ?", (tid,))
     # se era o pagamento de uma conta fixa, a conta volta a ficar pendente
     db.execute(
@@ -892,7 +988,7 @@ def excluir_transacao(tid):
     )
     db.commit()
     flash("Lançamento excluído.", "success")
-    return redirect(request.referrer or url_for("dashboard"))
+    return redirect(voltar)
 
 
 # ---------------------------------------------------------------------------
