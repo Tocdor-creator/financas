@@ -1,83 +1,94 @@
 # 💰 Finanças da Casa
 
-App local (roda no seu computador, no navegador) para você e sua esposa organizarem entradas, saídas, contas fixas e investimentos, com login separado para cada um, dashboard com gráficos, e importação de PDF com aprendizado automático de categorias.
+Esse é o app que eu fiz para organizar o dinheiro aqui de casa, meu e da Kauany.
 
-## Como instalar (só precisa fazer uma vez)
+A gente vivia anotando gasto em planilha, esquecendo conta para pagar e sem saber direito quanto ia sobrar no fim do mês. Então resolvi fazer um app do nosso jeito: com cara de app de banco, fácil de usar no celular e com cada um tendo o seu login, para saber quem lançou o quê.
 
-1. Instale o **Python 3** (se ainda não tiver): https://www.python.org/downloads/
-   - No Windows, marque a opção "Add Python to PATH" durante a instalação.
-2. Abra o terminal (ou Prompt de Comando) dentro desta pasta.
-3. Instale as dependências:
+Ele roda num celular Android aqui de casa (com Termux) e a gente acessa pelo navegador de qualquer lugar, usando o Tailscale. Nada fica em serviço de terceiros: os dados são nossos.
 
-   ```
-   pip install -r requirements.txt
-   ```
+## O que dá para fazer
 
-## Como rodar
+- **Início** — o saldo do mês e, logo embaixo, quanto **vai sobrar ou faltar** depois de pagar as contas que ainda estão em aberto. Tem atalhos para lançar entrada, saída, pagar conta, guardar dinheiro e importar extrato. O botão de olho no topo esconde os valores (bom para abrir o app perto dos outros).
+- **Extrato** — tudo o que entrou e saiu, agrupado por dia e mês a mês, com categoria e comprovante. Tocando em qualquer lançamento dá para editar ou excluir.
+- **Contas** — as contas fixas (aluguel, luz, água, internet…) cadastradas uma vez só, com dia de vencimento e quem paga. Todo mês elas aparecem de novo, avisando o que venceu ou vence em breve. Ao pagar, o lançamento vai sozinho para o extrato, com o comprovante se eu quiser anexar.
+- **Caixinhas** — o dinheiro guardado para cada sonho: viagem, reserva de emergência, carro… Cada caixinha tem foto, meta e barra de progresso. Também mostra a Selic e o CDI do momento (via Banco Central).
+- **Previsão x Realizado** — a gente define quanto planeja gastar e ganhar no mês e compara com o que aconteceu de verdade.
+- **Importar PDF** — mando o extrato do banco ou a fatura do cartão, confiro numa tela de revisão e salvo tudo de uma vez. O app aprende as categorias: marcou "Supermercado XYZ" como Mercado uma vez, da próxima já vem sugerido.
+- **Perfil** — cada um troca a própria senha e escolhe a cor do app e o fundo da tela. Também tem um botão para baixar o backup.
 
-Sempre que quiser usar o app:
+Outras coisinhas: login com bloqueio depois de 5 senhas erradas, valores e datas no formato brasileiro (R$ 1.234,56 · 27/09) e layout pensado primeiro para o celular.
 
-No VS Code: abra a pasta do projeto e aperte **F5**.
+## Como é feito
 
-Ou no terminal, dentro da pasta:
+- **Python + Flask** no back-end, com páginas em HTML (Jinja) e CSS próprio, sem framework de front.
+- **SQLite** como banco (um arquivo só, `financas.db`).
+- **pdfplumber** para ler os PDFs dos bancos.
+- **Chart.js** para os gráficos.
+
+```
+app.py              tudo do back-end: rotas, banco, regras
+templates/          as telas (base.html é o layout com o menu)
+static/css/         o visual
+servidor.sh         liga/desliga o app no servidor (Termux)
+```
+
+## Rodando no meu computador
+
+Na primeira vez:
+
+```
+python -m venv .venv
+.venv\Scripts\pip install -r requirements.txt
+```
+
+Depois é só abrir a pasta no VS Code e apertar **F5** (já está configurado para usar a `.venv`). Ou pelo terminal:
 
 ```
 .venv\Scripts\python app.py
 ```
 
-Vai aparecer uma mensagem tipo `Neste computador: http://127.0.0.1:5000`. Abra esse endereço no seu navegador.
+E abrir http://127.0.0.1:5000. Se o banco ainda não existir, o app pede para criar as duas contas.
 
-Para parar o servidor, volte ao terminal e aperte `CTRL + C`.
+## O servidor (celular com Termux)
 
-> Na primeira vez que rodar, o app vai te levar direto para uma tela de configuração para criar as duas contas (a sua e a da sua esposa).
+O app oficial roda no celular, na pasta `~/financas`. Lá dentro:
 
-## O que o app faz
+```
+sh servidor.sh iniciar   # liga em segundo plano
+sh servidor.sh parar     # desliga
+sh servidor.sh status    # está rodando?
+sh servidor.sh log       # últimas linhas do log
+```
 
-- **Login separado** — cada lançamento fica registrado com o nome de quem colocou. Limite de 5 tentativas erradas de senha (bloqueio de 15 minutos) para segurança.
-- **Início (estilo app de banco)** — saldo do mês com quanto vai sobrar ou faltar depois das contas a pagar, atalhos rápidos (Entrada, Saída, Pagar, Guardar, Importar), contas do mês com botão de pagar, caixinhas, últimos lançamentos, gastos por categoria e por pessoa e evolução dos últimos 6 meses. O botão de olho no topo esconde os valores.
-- **Extrato** — entradas, saídas e movimentos das caixinhas, agrupados por dia e navegáveis mês a mês, com categoria e comprovante opcional (PDF, JPG, PNG, WEBP).
-- **Contas Fixas** — cadastre uma vez (ex: Água, Luz, Aluguel), com dia de vencimento e responsável pelo pagamento (ex: "Água — Kauany", "Luz — Bruno", "Casa — Ambos"). Todo mês ela reaparece pronta para marcar como paga; ao confirmar, vira uma saída automaticamente com a data do pagamento, e você pode anexar o comprovante.
-- **Caixinhas** — dinheiro guardado para cada objetivo (viagem, reserva, carro…), com foto, meta opcional e barra de progresso. Guardar e resgatar a qualquer momento; mostra também a Selic e o CDI ao ano (via API pública do Banco Central, quando há internet).
-- **Previsão x Realizado** — defina quanto vocês planejam gastar/ganhar por mês e compare com o que realmente aconteceu, num gráfico de 4 linhas (Gastos Planejados, Gastos Reais, Ganhos Planejados, Ganhos Reais).
-- **Perfil** — cada pessoa pode trocar a própria senha e escolher sua paleta de cores e fundo da tela (branco, gradiente rosa, azul, lilás ou verde) — só muda a aparência para quem escolheu.
-- **Importar PDF** — extrato ou fatura, com tela de revisão antes de salvar e aprendizado automático de categoria (ex: uma vez marcado "Supermercado XYZ" como Mercado, da próxima vez ele já vem sugerido).
-- **Backup** — na tela de Perfil, um botão para baixar uma cópia do banco de dados (financas.db) a qualquer momento.
+Pelo Tailscale, a gente acessa `http://<ip-do-celular-no-tailscale>:5000` de qualquer lugar. Para o Android não matar o app, o Termux está sem restrição de bateria.
 
-## Sobre a leitura de PDF
+**Para mandar uma atualização** (só o código; o banco, as fotos e os comprovantes ficam no celular e não são sobrescritos):
 
-Bancos e cartões têm formatos de PDF bem diferentes entre si. O leitor tenta reconhecer linhas no formato `data + descrição + valor`. Ele não vai acertar 100% de todos os bancos — por isso a tela de revisão existe: você confere, corrige o que precisar (ou desmarca a linha) e só depois confirma. Linhas com data ou valor inválido são simplesmente ignoradas (com um aviso), sem travar a importação das demais. Se um PDF específico não for bem reconhecido, me mostre um exemplo (sem dados sensíveis) que eu ajusto o leitor para ele.
+```
+git archive HEAD | ssh -p 8022 <ip-do-celular> "cd ~/financas && tar -xf - && sh servidor.sh parar && sh servidor.sh iniciar"
+```
 
-## Acessando de outros aparelhos (celular, notebook da esposa, etc) — mesma Wi-Fi
+Antes de atualizar, eu faço um backup do `financas.db` do servidor na pasta `backups/` de lá.
 
-O app já está configurado para escutar na rede local.
-
-**Descobrir o IP local:**
-
-- **Windows**: Prompt de Comando → `ipconfig` → procure "Endereço IPv4".
-- **Mac**: Preferências do Sistema → Rede → Wi-Fi. Ou no terminal: `ipconfig getifaddr en0`.
-- **Linux**: no terminal, `hostname -I`.
-
-Com o app rodando, em qualquer aparelho na mesma Wi-Fi, abra `http://SEU-IP-LOCAL:5000` (ex: `http://192.168.0.15:5000`).
-
-Se não conseguir acessar: confirme que ambos estão na mesma rede, e libere o Python no Firewall do Windows (Configurações → Privacidade e segurança → Firewall e proteção de rede → Permitir um aplicativo pelo firewall → Python, marcando "Privada").
-
-## Colocando na internet (acessar de qualquer lugar, fora de casa)
-
-Hoje o app guarda tudo num arquivo local (SQLite) — funciona perfeitamente na rede de casa. Para acessar de qualquer lugar, o app precisa ficar hospedado em algum serviço, ligado o tempo todo. Um ponto importante: **Vercel não é indicado aqui** — ele roda em modelo "serverless" (o sistema de arquivos é apagado a cada reinício da função), então um banco de dados local se perderia a cada redeploy. Para um app com login, banco de dados e upload de arquivos, o caminho certo é um serviço que mantém um servidor "vivo" com disco persistente. Do mais simples ao mais robusto:
-
-1. **PythonAnywhere** — o mais simples para quem nunca fez deploy, ótimo para Flask + SQLite, tem plano gratuito limitado.
-2. **Railway.app** — conecta direto num repositório Git, tem volume persistente para o banco e os arquivos (fotos/comprovantes), plano de entrada barato.
-3. **Fly.io** — parecido ao Railway, com camada gratuita generosa e volumes persistentes.
-
-Qualquer uma dessas eu ajudo a configurar quando vocês decidirem qual seguir. Antes de expor na internet: troquem as senhas padrão por senhas fortes, e — se o serviço oferecer — ativem HTTPS (a maioria já vem com isso de graça). O limitador de tentativas de login já protege contra tentativas repetidas de adivinhar a senha.
+> No Termux, as bibliotecas `pillow` e `cryptography` têm que vir do `pkg` (`pkg install python-pillow python-cryptography`), porque pelo `pip` elas não compilam no Android. O resto vem do `requirements.txt`.
 
 ## Onde ficam os dados
 
-Tudo fica salvo localmente: lançamentos no arquivo `financas.db` (SQLite), comprovantes na pasta `comprovantes/`, fotos das caixinhas na pasta `sonhos/` — todos dentro desta mesma pasta do app, nada vai para a internet a menos que vocês decidam hospedar em algum serviço. Vale a pena, de vez em quando, usar o botão de backup na tela de Perfil (ou copiar essas pastas/arquivo manualmente) para um lugar seguro.
+- `financas.db` — todos os lançamentos, contas, caixinhas e logins
+- `comprovantes/` — os comprovantes anexados
+- `sonhos/` — as fotos das caixinhas
+- `secret.key` — a chave que mantém o login funcionando entre reinícios
 
-## Próximos passos possíveis (se quiser evoluir depois)
+Nada disso vai para o git (está no `.gitignore`). O lugar oficial dos dados é o servidor; no computador eu só desenvolvo e testo. De vez em quando baixo o backup pelo Perfil e guardo em outro lugar.
 
-- Editar lançamentos já salvos (hoje só dá pra excluir e recriar)
-- Exportar relatório em PDF/Excel
-- Cálculo automático de rendimento dos investimentos com base nas taxas do Banco Central
-- Migração do banco para PostgreSQL, caso decidam hospedar na nuvem com múltiplos acessos simultâneos
+## Sobre a leitura de PDF
+
+Cada banco tem um formato diferente de PDF, então o leitor procura linhas no padrão `data + descrição + valor` e não vai acertar 100% sempre. Por isso existe a tela de revisão: dá para corrigir ou desmarcar o que veio errado antes de salvar. Se a data vier sem ano (comum em fatura de cartão), ele deduz o ano certo, inclusive para fatura de dezembro importada em janeiro.
+
+## Ideias para depois
+
+- Avisar quando um PDF importado tiver lançamentos que já estão no app (evitar duplicados)
+- Planejar meses futuros na Previsão
+- Exportar para Excel
+- Proteção CSRF nos formulários
+- Fazer o app subir sozinho quando o celular reiniciar (Termux:Boot)
