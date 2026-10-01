@@ -1,0 +1,148 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import linha_lancamento, cartao_caixinha, barra %}
+{% block title %}Início{% endblock %}
+
+{% block cabecalho %}
+  <p class="saudacao">Olá, {{ g.user.display_name }}</p>
+  <p class="cabecalho-subtitulo">Resumo de {{ mes }}</p>
+{% endblock %}
+
+{% block content %}
+<a class="cartao cartao-link" href="{{ url_for('lancamentos.extrato') }}">
+  <div class="secao-topo">
+    <span class="rotulo">Saldo de {{ mes }}</span>
+    {{ icone('seta-direita', 20) }}
+  </div>
+  <div class="saldo valor {{ 'negativo' if saldo < 0 }}">{{ saldo|brl }}</div>
+
+  <dl class="resumo-mes">
+    <div><dt>Entrou</dt><dd class="valor positivo">{{ entradas|brl }}</dd></div>
+    <div><dt>Saiu</dt><dd class="valor negativo">{{ saidas|brl }}</dd></div>
+    <div><dt>Guardado</dt><dd class="valor">{{ guardado|brl }}</dd></div>
+  </dl>
+
+  <div class="previsao {{ 'previsao-sobra' if previsao >= 0 else 'previsao-falta' }}">
+    {{ icone('check' if previsao >= 0 else 'alerta', 20) }}
+    <p>
+      {% if resumo_contas.pendentes %}
+        Depois de pagar <span class="valor">{{ resumo_contas.a_pagar|brl }}</span> em contas,
+        {{ 'vai sobrar' if previsao >= 0 else 'vai faltar' }} <strong class="valor">{{ previsao|abs|brl }}</strong>
+      {% else %}
+        {{ 'Sobrando' if previsao >= 0 else 'Faltando' }} <strong class="valor">{{ previsao|abs|brl }}</strong> este mês
+      {% endif %}
+    </p>
+  </div>
+</a>
+
+<nav class="atalhos" aria-label="Atalhos">
+  <a href="{{ url_for('lancamentos.novo', tipo='entrada') }}"><span>{{ icone('entrada', 24) }}</span>Entrada</a>
+  <a href="{{ url_for('lancamentos.novo', tipo='saida') }}"><span>{{ icone('saida', 24) }}</span>Saída</a>
+  <a href="{{ url_for('contas.lista') }}"><span>{{ icone('pagar', 24) }}</span>Pagar</a>
+  <a href="{{ url_for('caixinhas.lista') }}"><span>{{ icone('caixinha', 24) }}</span>Guardar</a>
+  <a href="{{ url_for('importacao.enviar') }}"><span>{{ icone('importar', 24) }}</span>Importar</a>
+</nav>
+
+<div class="grade-2">
+  <section class="cartao">
+    <div class="secao-topo">
+      <h2>Contas do mês</h2>
+      <a href="{{ url_for('contas.lista') }}">Ver todas</a>
+    </div>
+    {% if contas %}
+      <p class="rotulo">
+        {{ resumo_contas.pagas }} de {{ resumo_contas.total }} pagas
+        {%- if resumo_contas.pendentes %} · falta <span class="valor">{{ resumo_contas.a_pagar|brl }}</span>{% endif %}
+      </p>
+      {{ barra((resumo_contas.pagas / resumo_contas.total * 100)|round, classe='barra-positiva') }}
+      {% if resumo_contas.pendentes %}
+      <ul class="lista">
+        {% for c in resumo_contas.pendentes[:4] %}
+        <li class="item">
+          <span class="item-icone">{{ icone(c.categoria|icone_categoria, 20) }}</span>
+          <div class="item-corpo">
+            <div class="item-titulo">{{ c.descricao }}</div>
+            <div class="item-detalhe"><span class="selo selo-{{ c.situacao }}">{{ c.situacao_texto }}</span></div>
+          </div>
+          <div class="item-fim">
+            <span class="item-valor valor">{{ c.valor|brl }}</span>
+            <a class="botao botao-pequeno" href="{{ url_for('contas.pagar', pagamento_id=c.id) }}">Pagar</a>
+          </div>
+        </li>
+        {% endfor %}
+      </ul>
+      {% if resumo_contas.pendentes|length > 4 %}
+        <p class="texto-secundario texto-pequeno">e mais {{ resumo_contas.pendentes|length - 4 }}</p>
+      {% endif %}
+      {% else %}
+        <p class="vazio">Todas as contas do mês estão pagas.</p>
+      {% endif %}
+    {% else %}
+      <p class="vazio">Cadastre água, luz, aluguel e outras contas para acompanhar os vencimentos aqui.</p>
+      <a class="botao botao-secundario botao-largo" href="{{ url_for('contas.lista', _anchor='nova') }}">Cadastrar conta</a>
+    {% endif %}
+  </section>
+
+  <section class="cartao">
+    <div class="secao-topo">
+      <h2>Caixinhas</h2>
+      <a href="{{ url_for('caixinhas.lista') }}">Ver todas</a>
+    </div>
+    <p class="rotulo">Total guardado</p>
+    <p class="saldo saldo-menor valor">{{ total_guardado|brl }}</p>
+    {% if caixinhas %}
+      <div class="carrossel">{% for c in caixinhas %}{{ cartao_caixinha(c) }}{% endfor %}</div>
+    {% else %}
+      <a class="botao botao-secundario botao-largo" href="{{ url_for('caixinhas.lista', _anchor='nova') }}">Criar caixinha</a>
+    {% endif %}
+  </section>
+</div>
+
+<section class="cartao">
+  <div class="secao-topo">
+    <h2>Últimos lançamentos</h2>
+    <a href="{{ url_for('lancamentos.extrato') }}">Extrato</a>
+  </div>
+  {% if ultimos %}
+    <ul class="lista">{% for t in ultimos %}{{ linha_lancamento(t, request.full_path, mostrar_data=true) }}{% endfor %}</ul>
+  {% else %}
+    <p class="vazio">Nenhum lançamento ainda. Use os atalhos acima para começar.</p>
+  {% endif %}
+</section>
+
+<div class="grade-2">
+  <section class="cartao">
+    <h2>Gastos por categoria</h2>
+    {% for c in categorias %}
+    <div class="linha-barra">
+      <div class="linha-barra-topo">
+        <span>{{ c.nome }}</span>
+        <span class="valor"><strong>{{ c.total|brl }}</strong> <span class="texto-secundario">· {{ c.pct }}%</span></span>
+      </div>
+      {{ barra(c.pct) }}
+    </div>
+    {% else %}
+    <p class="vazio">Sem saídas em {{ mes }}.</p>
+    {% endfor %}
+  </section>
+
+  <section class="cartao">
+    <h2>Gastos por pessoa</h2>
+    {% for p in pessoas %}
+    <div class="linha-barra">
+      <div class="linha-barra-topo"><span>{{ p.nome }}</span><strong class="valor">{{ p.total|brl }}</strong></div>
+      {{ barra((p.total / saidas * 100)|round if saidas else 0, cor=p.cor) }}
+    </div>
+    {% endfor %}
+  </section>
+</div>
+
+<section class="cartao">
+  <h2>Últimos 6 meses</h2>
+  <div class="grafico">
+    <canvas data-grafico='{{ grafico_evolucao|tojson }}'></canvas>
+  </div>
+</section>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}"></script>{% endblock %}

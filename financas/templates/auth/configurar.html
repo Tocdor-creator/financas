@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Configuração inicial{% endblock %}
+
+{% block content %}
+<div class="acesso acesso-largo">
+  <h1 class="acesso-titulo">Finanças da Casa</h1>
+  <p class="acesso-subtitulo">Crie as duas contas para começar.</p>
+  <form class="cartao" method="post">
+    {% for i in [1, 2] %}
+    <fieldset class="grupo">
+      <legend>Pessoa {{ i }}</legend>
+      <div class="campo">
+        <label for="display{{ i }}">Nome</label>
+        <input id="display{{ i }}" type="text" name="display{{ i }}" required>
+      </div>
+      <div class="campo">
+        <label for="username{{ i }}">Usuário</label>
+        <input id="username{{ i }}" type="text" name="username{{ i }}" required autocapitalize="none">
+      </div>
+      <div class="campo">
+        <label for="password{{ i }}">Senha</label>
+        <input id="password{{ i }}" type="password" name="password{{ i }}" required autocomplete="new-password">
+      </div>
+    </fieldset>
+    {% endfor %}
+    <button type="submit" class="botao botao-largo">Criar contas</button>
+  </form>
+</div>
+{% endblock %}

@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import barra, lista_categorias %}
+{% block title %}Contas{% endblock %}
+{% block cabecalho %}<h1>Contas de {{ mes|lower }}</h1>{% endblock %}
+
+{% block content %}
+<div class="cartao">
+  <p class="rotulo">Falta pagar</p>
+  <p class="saldo valor {{ 'negativo' if resumo.a_pagar > 0 }}">{{ resumo.a_pagar|brl }}</p>
+  {% if contas %}
+    <p class="rotulo">{{ resumo.pagas }} de {{ resumo.total }} pagas · já pago <span class="valor">{{ resumo.pago|brl }}</span></p>
+    {{ barra((resumo.pagas / resumo.total * 100)|round, classe='barra-positiva') }}
+  {% endif %}
+</div>
+
+<div class="cartao">
+  {% for grupo in contas|groupby('status')|sort(attribute='grouper', reverse=true) %}
+    <h2 class="titulo-dia">{{ 'Pagas' if grupo.grouper == 'pago' else 'A pagar' }}</h2>
+    <ul class="lista">
+      {% for c in grupo.list %}
+      <li class="item">
+        {% if c.status == 'pago' and c.transaction_id %}
+          <a class="item-link" href="{{ url_for('lancamentos.editar', lancamento_id=c.transaction_id, voltar=request.full_path) }}" aria-label="Editar pagamento de {{ c.descricao }}"></a>
+        {% endif %}
+        <span class="item-icone {{ 'item-icone-positivo' if c.status == 'pago' }}">
+          {{ icone('check' if c.status == 'pago' else c.categoria|icone_categoria, 20) }}
+        </span>
+        <div class="item-corpo">
+          <div class="item-titulo">{{ c.descricao }}</div>
+          <div class="item-detalhe">
+            <span class="selo selo-{{ c.situacao }}">{{ c.situacao_texto }}</span>{% if c.responsavel %} · {{ c.responsavel }}{% endif %}
+          </div>
+        </div>
+        <div class="item-fim">
+          <span class="item-valor valor">{{ c.valor|brl }}</span>
+          {% if c.status == 'pago' %}
+            <div class="item-acao">
+              {% if c.comprovante %}
+                <a class="botao-icone" href="{{ url_for('arquivos.comprovante', nome=c.comprovante) }}" target="_blank" title="Ver comprovante">{{ icone('anexo', 18) }}</a>
+              {% endif %}
+              <form method="post" action="{{ url_for('contas.desfazer', pagamento_id=c.id) }}" data-confirmar="Desfazer esse pagamento? A saída correspondente será excluída.">
+                <button type="submit" class="botao-icone" title="Desfazer pagamento">{{ icone('desfazer', 18) }}</button>
+              </form>
+            </div>
+          {% else %}
+            <a class="botao botao-pequeno item-acao" href="{{ url_for('contas.pagar', pagamento_id=c.id) }}">Pagar</a>
+          {% endif %}
+        </div>
+      </li>
+      {% endfor %}
+    </ul>
+  {% else %}
+    <p class="vazio">Nenhuma conta cadastrada. As contas cadastradas aparecem aqui todo mês, prontas para pagar.</p>
+  {% endfor %}
+</div>
+
+<details class="cartao recolhivel" id="nova" {{ 'open' if not contas }}>
+  <summary>{{ icone('adicionar', 20) }} Nova conta</summary>
+  <form method="post" action="{{ url_for('contas.nova') }}">
+    <div class="campo">
+      <label for="conta-descricao">Nome</label>
+      <input id="conta-descricao" type="text" name="descricao" placeholder="ex.: Água, Luz, Aluguel" required>
+    </div>
+    <div class="campos-lado-a-lado">
+      <div class="campo">
+        <label for="conta-valor">Valor (R$)</label>
+        <input id="conta-valor" type="text" name="valor" placeholder="0,00" required inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="conta-dia">Dia do vencimento</label>
+        <input id="conta-dia" type="number" name="dia_vencimento" min="1" max="31" required>
+      </div>
+    </div>
+    <div class="campos-lado-a-lado">
+      <div class="campo">
+        <label for="conta-categoria">Categoria</label>
+        <input id="conta-categoria" type="text" name="categoria" list="categorias" placeholder="ex.: Moradia">
+      </div>
+      <div class="campo">
+        <label for="conta-responsavel">Quem paga</label>
+        <input id="conta-responsavel" type="text" name="responsavel" list="responsaveis" placeholder="ex.: Ambos">
+      </div>
+    </div>
+    {{ lista_categorias(categorias) }}
+    <datalist id="responsaveis">
+      {% for u in usuarios %}<option value="{{ u.display_name }}">{% endfor %}
+      <option value="Ambos">
+    </datalist>
+    <button type="submit" class="botao botao-largo">Adicionar conta</button>
+  </form>
+</details>
+
+{% if cadastradas %}
+<details class="cartao recolhivel">
+  <summary>{{ icone('editar', 20) }} Contas cadastradas ({{ cadastradas|length }})</summary>
+  <ul class="lista">
+    {% for c in cadastradas %}
+    <li class="item">
+      <span class="item-icone">{{ icone(c.categoria|icone_categoria, 20) }}</span>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ c.descricao }}</div>
+        <div class="item-detalhe">Todo dia {{ c.dia_vencimento }}{% if c.responsavel %} · {{ c.responsavel }}{% endif %}</div>
+      </div>
+      <span class="item-valor valor">{{ c.valor|brl }}</span>
+      <form method="post" action="{{ url_for('contas.remover', conta_id=c.id) }}"
+            data-confirmar="Remover {{ c.descricao }} das contas mensais? Os pagamentos já feitos continuam no histórico.">
+        <button type="submit" class="botao-icone" title="Remover">{{ icone('lixeira', 18) }}</button>
+      </form>
+    </li>
+    {% endfor %}
+  </ul>
+</details>
+{% endif %}
+{% endblock %}

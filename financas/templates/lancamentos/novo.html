@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import campo_valor, lista_categorias %}
+{% block title %}{{ 'Nova entrada' if tipo == 'entrada' else 'Nova saída' }}{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('lancamentos.extrato') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<form class="cartao" method="post" enctype="multipart/form-data">
+  <input type="hidden" name="tipo" value="{{ tipo }}">
+  {{ campo_valor('Quanto entrou?' if tipo == 'entrada' else 'Quanto saiu?', autofocus=true) }}
+
+  <div class="campo">
+    <label for="descricao">Descrição</label>
+    <input id="descricao" type="text" name="descricao" required
+           placeholder="{{ 'ex.: Salário' if tipo == 'entrada' else 'ex.: Supermercado' }}">
+  </div>
+  <div class="campos-lado-a-lado">
+    <div class="campo">
+      <label for="data">Data</label>
+      <input id="data" type="date" name="data" value="{{ hoje }}" required>
+    </div>
+    <div class="campo">
+      <label for="categoria">Categoria</label>
+      <input id="categoria" type="text" name="categoria" list="categorias">
+    </div>
+  </div>
+  {{ lista_categorias(categorias) }}
+  <p class="dica">Descrições parecidas recebem a mesma categoria automaticamente nas próximas vezes.</p>
+
+  <div class="campo">
+    <label for="comprovante">Comprovante (opcional)</label>
+    <input id="comprovante" type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
+  </div>
+
+  <button type="submit" class="botao botao-largo">Salvar</button>
+</form>
+{% endblock %}

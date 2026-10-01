@@ -1,4 +1,4 @@
-# 💰 Finanças da Casa
+# Finanças da Casa
 
 Esse é o app que eu fiz para organizar o dinheiro aqui de casa, meu e da Kauany.
 
@@ -14,7 +14,7 @@ Ele roda num celular Android aqui de casa (com Termux) e a gente acessa pelo nav
 - **Caixinhas** — o dinheiro guardado para cada sonho: viagem, reserva de emergência, carro… Cada caixinha tem foto, meta e barra de progresso. Também mostra a Selic e o CDI do momento (via Banco Central).
 - **Previsão x Realizado** — a gente define quanto planeja gastar e ganhar no mês e compara com o que aconteceu de verdade.
 - **Importar PDF** — mando o extrato do banco ou a fatura do cartão, confiro numa tela de revisão e salvo tudo de uma vez. O app aprende as categorias: marcou "Supermercado XYZ" como Mercado uma vez, da próxima já vem sugerido.
-- **Perfil** — cada um troca a própria senha e escolhe a cor do app e o fundo da tela. Também tem um botão para baixar o backup.
+- **Perfil** — cada um troca a própria senha e escolhe a cor do app. Também tem um botão para baixar o backup.
 
 Outras coisinhas: login com bloqueio depois de 5 senhas erradas, valores e datas no formato brasileiro (R$ 1.234,56 · 27/09) e layout pensado primeiro para o celular.
 
@@ -24,13 +24,33 @@ Outras coisinhas: login com bloqueio depois de 5 senhas erradas, valores e datas
 - **SQLite** como banco (um arquivo só, `financas.db`).
 - **pdfplumber** para ler os PDFs dos bancos.
 - **Chart.js** para os gráficos.
+- **pytest** para os testes.
 
 ```
-app.py              tudo do back-end: rotas, banco, regras
-templates/          as telas (base.html é o layout com o menu)
-static/css/         o visual
-servidor.sh         liga/desliga o app no servidor (Termux)
+app.py                  ponto de entrada (python app.py)
+financas/
+  __init__.py           create_app: monta a aplicação e registra os módulos
+  config.py             caminhos, categorias, temas e limites
+  db.py                 esquema do banco e migrações
+  formatacao.py         valores e datas no formato brasileiro
+  auth.py               login, logout, configuração inicial e limite de tentativas
+  inicio.py             tela inicial e menu "Mais"
+  lancamentos.py        extrato, novo lançamento, edição e exclusão
+  contas.py             contas fixas e pagamentos do mês
+  caixinhas.py          caixinhas, guardar e resgatar
+  previsao.py           previsão x realizado
+  importacao.py         leitura de PDF e revisão
+  perfil.py             senha, cor do app e backup
+  categorias.py         sugestão de categoria aprendida
+  arquivos.py           upload/download de comprovantes e fotos
+  taxas.py              Selic e CDI (API do Banco Central)
+  templates/            uma pasta por módulo; base.html é o layout
+  static/               CSS, JS e Chart.js
+tests/                  testes (pytest)
+servidor.sh             liga/desliga o app no servidor (Termux)
 ```
+
+Cada módulo de tela é um *blueprint* do Flask com as rotas e as regras daquele assunto.
 
 ## Rodando no meu computador
 
@@ -38,7 +58,7 @@ Na primeira vez:
 
 ```
 python -m venv .venv
-.venv\Scripts\pip install -r requirements.txt
+.venv\Scripts\pip install -r requirements-dev.txt
 ```
 
 Depois é só abrir a pasta no VS Code e apertar **F5** (já está configurado para usar a `.venv`). Ou pelo terminal:
@@ -48,6 +68,12 @@ Depois é só abrir a pasta no VS Code e apertar **F5** (já está configurado p
 ```
 
 E abrir http://127.0.0.1:5000. Se o banco ainda não existir, o app pede para criar as duas contas.
+
+Para rodar os testes:
+
+```
+.venv\Scripts\python -m pytest
+```
 
 ## O servidor (celular com Termux)
 

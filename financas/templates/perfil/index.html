@@ -1,0 +1,44 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% block title %}Meu perfil{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('inicio.mais') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<form class="cartao" method="post" action="{{ url_for('perfil.salvar_aparencia') }}">
+  <h2>Cor do app</h2>
+  <p class="dica">Só muda para você.</p>
+  <fieldset class="opcoes">
+    <legend class="visualmente-oculto">Cor</legend>
+    {% for chave, t in temas.items() %}
+    <label class="opcao">
+      <input type="radio" name="tema" value="{{ chave }}" {{ 'checked' if chave == tema_chave }}>
+      <span class="amostra-cor" style="background: {{ t.cor }}"></span>{{ t.nome }}
+    </label>
+    {% endfor %}
+  </fieldset>
+  <button type="submit" class="botao botao-largo">Salvar</button>
+</form>
+
+<form class="cartao" method="post" action="{{ url_for('perfil.trocar_senha') }}">
+  <h2>Trocar senha</h2>
+  <div class="campo">
+    <label for="senha-atual">Senha atual</label>
+    <input id="senha-atual" type="password" name="senha_atual" required autocomplete="current-password">
+  </div>
+  <div class="campo">
+    <label for="senha-nova">Nova senha</label>
+    <input id="senha-nova" type="password" name="senha_nova" required autocomplete="new-password">
+  </div>
+  <div class="campo">
+    <label for="senha-confirmar">Confirmar nova senha</label>
+    <input id="senha-confirmar" type="password" name="senha_confirmar" required autocomplete="new-password">
+  </div>
+  <button type="submit" class="botao botao-largo">Atualizar senha</button>
+</form>
+
+<section class="cartao">
+  <h2>Backup</h2>
+  <p class="texto-secundario">Baixa uma cópia de todos os dados (financas.db).</p>
+  <a class="botao botao-secundario botao-largo" href="{{ url_for('perfil.backup') }}">{{ icone('download', 18) }} Baixar backup</a>
+</section>
+{% endblock %}

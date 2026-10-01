@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import campo_valor, lista_categorias %}
+{% block title %}Pagar conta{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('contas.lista') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<form class="cartao" method="post" enctype="multipart/form-data">
+  <div class="texto-centro">
+    <h2>{{ pagamento.descricao }}</h2>
+    {% if pagamento.responsavel %}<p class="texto-secundario texto-pequeno">Quem paga: {{ pagamento.responsavel }}</p>{% endif %}
+  </div>
+
+  {{ campo_valor('Valor pago', pagamento.valor|valor_input) }}
+
+  <div class="campos-lado-a-lado">
+    <div class="campo">
+      <label for="data">Data do pagamento</label>
+      <input id="data" type="date" name="data_pagamento" value="{{ hoje }}" required>
+    </div>
+    <div class="campo">
+      <label for="categoria">Categoria</label>
+      <input id="categoria" type="text" name="categoria" list="categorias" value="{{ pagamento.categoria or '' }}">
+    </div>
+  </div>
+  {{ lista_categorias(categorias) }}
+
+  <div class="campo">
+    <label for="comprovante">Comprovante (opcional)</label>
+    <input id="comprovante" type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
+  </div>
+  <p class="dica">O pagamento entra no extrato como uma saída.</p>
+
+  <button type="submit" class="botao botao-largo">Confirmar pagamento</button>
+</form>
+{% endblock %}

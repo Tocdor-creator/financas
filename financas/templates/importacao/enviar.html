@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% block title %}Importar PDF{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('inicio.mais') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<form class="cartao" method="post" enctype="multipart/form-data">
+  <p class="texto-secundario">Envie o PDF do extrato do banco ou da fatura do cartão. Na próxima tela você confere cada lançamento antes de salvar.</p>
+  <div class="campo">
+    <label for="pdf">Arquivo PDF</label>
+    <input id="pdf" type="file" name="pdf" accept="application/pdf" required>
+  </div>
+  <button type="submit" class="botao botao-largo">Analisar PDF</button>
+  <p class="dica">Cada banco usa um formato diferente. O que não for reconhecido pode ser corrigido na revisão ou lançado manualmente.</p>
+</form>
+{% endblock %}

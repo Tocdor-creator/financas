@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import linha_lancamento %}
+{% block title %}Extrato{% endblock %}
+
+{% block content %}
+<div class="cartao">
+  <div class="navegacao-mes">
+    <a href="{{ url_for('lancamentos.extrato', mes=mes_anterior, tipo=filtro or none) }}" aria-label="Mês anterior">{{ icone('seta-esquerda') }}</a>
+    <strong>{{ mes_nome }}</strong>
+    <a href="{{ url_for('lancamentos.extrato', mes=mes_seguinte, tipo=filtro or none) }}" aria-label="Próximo mês">{{ icone('seta-direita') }}</a>
+  </div>
+  <dl class="resumo-mes resumo-mes-destaque">
+    <div><dt>Entrou</dt><dd class="valor positivo">{{ entradas|brl }}</dd></div>
+    <div><dt>Saiu</dt><dd class="valor negativo">{{ saidas|brl }}</dd></div>
+  </dl>
+  <div class="botoes">
+    <a class="botao botao-secundario" href="{{ url_for('lancamentos.novo', tipo='entrada') }}">{{ icone('entrada', 18) }} Entrada</a>
+    <a class="botao botao-secundario" href="{{ url_for('lancamentos.novo', tipo='saida') }}">{{ icone('saida', 18) }} Saída</a>
+  </div>
+</div>
+
+<nav class="abas" aria-label="Filtrar lançamentos">
+  {% for valor, rotulo in [('', 'Tudo'), ('entrada', 'Entradas'), ('saida', 'Saídas'), ('caixinha', 'Caixinhas')] %}
+  <a href="{{ url_for('lancamentos.extrato', mes=mes, tipo=valor or none) }}" {% if filtro == valor %}aria-current="page"{% endif %}>{{ rotulo }}</a>
+  {% endfor %}
+</nav>
+
+<div class="cartao">
+  {% for dia, lancamentos in dias %}
+    <h2 class="titulo-dia">{{ dia|dia_relativo }}</h2>
+    <ul class="lista">{% for t in lancamentos %}{{ linha_lancamento(t, request.full_path) }}{% endfor %}</ul>
+  {% else %}
+    <p class="vazio">Nenhum lançamento em {{ mes_nome|lower }}.</p>
+  {% endfor %}
+</div>
+{% endblock %}

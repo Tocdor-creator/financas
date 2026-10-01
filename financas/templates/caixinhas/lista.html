@@ -1,0 +1,49 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import cartao_caixinha %}
+{% block title %}Caixinhas{% endblock %}
+
+{% block content %}
+<div class="cartao">
+  <p class="rotulo">Total guardado</p>
+  <p class="saldo valor">{{ total|brl }}</p>
+  {% if selic or cdi %}
+  <p class="taxas">
+    {% if selic %}<span class="selo" title="Meta Selic definida pelo Copom">Selic {{ selic.valor|replace('.', ',') }}% a.a.</span>{% endif %}
+    {% if cdi %}<span class="selo" title="CDI anualizado em {{ cdi.data }}">CDI {{ cdi.valor|replace('.', ',') }}% a.a.</span>{% endif %}
+  </p>
+  {% endif %}
+</div>
+
+{% if caixinhas %}
+<div class="grade-caixinhas">{% for c in caixinhas %}{{ cartao_caixinha(c) }}{% endfor %}</div>
+{% endif %}
+
+<details class="cartao recolhivel" id="nova" {{ 'open' if not caixinhas }}>
+  <summary>{{ icone('adicionar', 20) }} Nova caixinha</summary>
+  <p class="dica">Uma caixinha para cada objetivo: viagem, reserva de emergência, carro. Foto e meta são opcionais.</p>
+  <form method="post" action="{{ url_for('caixinhas.nova') }}" enctype="multipart/form-data">
+    <div class="campo">
+      <label for="caixinha-nome">Nome</label>
+      <input id="caixinha-nome" type="text" name="nome" placeholder="ex.: Viagem" required>
+    </div>
+    <div class="campos-lado-a-lado">
+      <div class="campo">
+        <label for="caixinha-meta">Meta (opcional)</label>
+        <input id="caixinha-meta" type="text" name="meta" placeholder="ex.: 5.000,00" inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="caixinha-tipo">Onde está guardado</label>
+        <select id="caixinha-tipo" name="tipo">
+          {% for t in tipos %}<option {{ 'selected' if t == 'Outro' }}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="caixinha-foto">Foto (opcional)</label>
+      <input id="caixinha-foto" type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif">
+    </div>
+    <button type="submit" class="botao botao-largo">Criar caixinha</button>
+  </form>
+</details>
+{% endblock %}

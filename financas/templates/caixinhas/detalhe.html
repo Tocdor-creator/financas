@@ -1,0 +1,94 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import barra, campo_valor, foto_caixinha %}
+{% block title %}{{ caixinha.nome }}{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('caixinhas.lista') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<div class="cartao cartao-com-imagem">
+  {{ foto_caixinha(caixinha, 'caixinha-foto-grande') }}
+  <div class="cartao-corpo">
+    <p class="rotulo">Guardado</p>
+    <p class="saldo valor">{{ caixinha.saldo|brl }}</p>
+    {% if caixinha.meta %}
+      {{ barra(caixinha.progresso) }}
+      <p class="rotulo">
+        {{ caixinha.progresso }}% da meta de <span class="valor">{{ caixinha.meta|brl }}</span>
+        {%- if caixinha.saldo < caixinha.meta %} · faltam <span class="valor">{{ (caixinha.meta - caixinha.saldo)|brl }}</span>
+        {%- else %} · meta atingida{% endif %}
+      </p>
+    {% endif %}
+    <p class="taxas"><span class="selo">{{ caixinha.tipo or 'Outro' }}</span></p>
+  </div>
+</div>
+
+<form class="cartao" method="post" action="{{ url_for('caixinhas.movimentar', caixinha_id=caixinha.id) }}">
+  {{ campo_valor('Quanto?') }}
+  <div class="campos-lado-a-lado">
+    <div class="campo">
+      <label for="data">Data</label>
+      <input id="data" type="date" name="data" value="{{ hoje }}" required>
+    </div>
+    <div class="campo">
+      <label for="descricao">Descrição (opcional)</label>
+      <input id="descricao" type="text" name="descricao">
+    </div>
+  </div>
+  <div class="botoes">
+    <button type="submit" name="acao" value="guardar" class="botao">Guardar</button>
+    <button type="submit" name="acao" value="resgatar" class="botao botao-secundario">Resgatar</button>
+  </div>
+</form>
+
+<section class="cartao">
+  <h2>Movimentações</h2>
+  <ul class="lista">
+    {% for t in movimentos %}
+    <li class="item">
+      <a class="item-link" href="{{ url_for('lancamentos.editar', lancamento_id=t.id, voltar=request.full_path) }}" aria-label="Editar {{ t.descricao }}"></a>
+      <span class="item-icone">{{ icone('entrada' if t.tipo == 'investimento_deposito' else 'saida', 20) }}</span>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ t.descricao }}</div>
+        <div class="item-detalhe">{{ t.data|data_br }} · {{ t.nome }}</div>
+      </div>
+      <span class="item-valor valor {{ 'positivo' if t.tipo == 'investimento_deposito' }}">
+        {{ '+' if t.tipo == 'investimento_deposito' else '−' }}{{ t.valor|brl }}
+      </span>
+    </li>
+    {% else %}
+    <li class="vazio">Nenhuma movimentação ainda.</li>
+    {% endfor %}
+  </ul>
+</section>
+
+<details class="cartao recolhivel">
+  <summary>{{ icone('editar', 20) }} Editar caixinha</summary>
+  <form method="post" action="{{ url_for('caixinhas.editar', caixinha_id=caixinha.id) }}" enctype="multipart/form-data">
+    <div class="campo">
+      <label for="editar-nome">Nome</label>
+      <input id="editar-nome" type="text" name="nome" value="{{ caixinha.nome }}" required>
+    </div>
+    <div class="campos-lado-a-lado">
+      <div class="campo">
+        <label for="editar-meta">Meta (opcional)</label>
+        <input id="editar-meta" type="text" name="meta" value="{{ caixinha.meta|valor_input if caixinha.meta }}" inputmode="decimal">
+      </div>
+      <div class="campo">
+        <label for="editar-tipo">Onde está guardado</label>
+        <select id="editar-tipo" name="tipo">
+          {% for t in tipos %}<option {{ 'selected' if t == caixinha.tipo }}>{{ t }}</option>{% endfor %}
+        </select>
+      </div>
+    </div>
+    <div class="campo">
+      <label for="editar-foto">{{ 'Trocar foto' if caixinha.foto else 'Foto (opcional)' }}</label>
+      <input id="editar-foto" type="file" name="foto" accept=".jpg,.jpeg,.png,.webp,.gif">
+    </div>
+    <button type="submit" class="botao botao-largo">Salvar alterações</button>
+  </form>
+  <form method="post" action="{{ url_for('caixinhas.apagar', caixinha_id=caixinha.id) }}"
+        data-confirmar="Apagar a caixinha {{ caixinha.nome }}? As movimentações continuam no histórico.">
+    <button type="submit" class="botao botao-perigo botao-largo">{{ icone('lixeira', 18) }} Apagar caixinha</button>
+  </form>
+</details>
+{% endblock %}

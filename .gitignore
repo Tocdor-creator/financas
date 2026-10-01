@@ -16,3 +16,4 @@ backups/
 # servidor (Termux)
 app.pid
 app.log
+.pytest_cache/

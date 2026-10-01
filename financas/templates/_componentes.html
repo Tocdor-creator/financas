@@ -1,0 +1,75 @@
+{% from "_icones.html" import icone %}
+
+{# Linha de lançamento; a linha inteira leva à edição e `voltar` é para onde a edição retorna. #}
+{% macro linha_lancamento(t, voltar, mostrar_data=false) -%}
+{% set eh_caixinha = t.tipo.startswith('investimento') %}
+{% set credito = t.tipo in ('entrada', 'investimento_resgate') %}
+<li class="item">
+  <a class="item-link" href="{{ url_for('lancamentos.editar', lancamento_id=t.id, voltar=voltar) }}" aria-label="Editar {{ t.descricao }}"></a>
+  {% if t.tipo == 'entrada' %}
+    <span class="item-icone item-icone-positivo">{{ icone('entrada', 20) }}</span>
+  {% elif eh_caixinha %}
+    <span class="item-icone">{{ icone('caixinha', 20) }}</span>
+  {% else %}
+    <span class="item-icone">{{ icone(t.categoria|icone_categoria, 20) }}</span>
+  {% endif %}
+  <div class="item-corpo">
+    <div class="item-titulo">{{ t.descricao }}</div>
+    <div class="item-detalhe">
+      {%- if eh_caixinha -%}
+        {{ 'Guardado' if t.tipo == 'investimento_deposito' else 'Resgatado' }}{% if t.caixinha_nome %} · {{ t.caixinha_nome }}{% endif %}
+      {%- else -%}
+        {{ t.categoria or 'Sem categoria' }}
+      {%- endif %} · {{ t.nome }}
+      {%- if mostrar_data %} · {{ t.data|data_curta }}{% endif %}
+      {%- if t.origem == 'conta_fixa' %} · conta fixa{% elif t.origem == 'pdf' %} · PDF{% endif %}
+    </div>
+  </div>
+  <div class="item-fim">
+    <span class="item-valor valor {{ 'positivo' if t.tipo == 'entrada' }}">{{ '+' if credito else '−' }}{{ t.valor|brl }}</span>
+    {% if t.comprovante %}
+    <a class="botao-icone item-acao" href="{{ url_for('arquivos.comprovante', nome=t.comprovante) }}" target="_blank" title="Ver comprovante">{{ icone('anexo', 18) }}</a>
+    {% endif %}
+  </div>
+</li>
+{%- endmacro %}
+
+{% macro foto_caixinha(c, classe='') -%}
+{% if c.foto %}
+  <img class="caixinha-foto {{ classe }}" src="{{ url_for('arquivos.foto', nome=c.foto) }}" alt="">
+{% else %}
+  <div class="caixinha-foto caixinha-foto-vazia {{ classe }}">{{ icone('caixinha', 32) }}</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro cartao_caixinha(c) -%}
+<a class="caixinha" href="{{ url_for('caixinhas.detalhe', caixinha_id=c.id) }}">
+  {{ foto_caixinha(c) }}
+  <div class="caixinha-corpo">
+    <div class="caixinha-nome">{{ c.nome }}</div>
+    <div class="caixinha-saldo valor">{{ c.saldo|brl }}</div>
+    {% if c.meta %}
+      {{ barra(c.progresso) }}
+      <div class="texto-secundario texto-pequeno">{{ c.progresso }}% de <span class="valor">{{ c.meta|brl }}</span></div>
+    {% else %}
+      <div class="texto-secundario texto-pequeno">{{ c.tipo or 'Sem meta' }}</div>
+    {% endif %}
+  </div>
+</a>
+{%- endmacro %}
+
+{% macro barra(percentual, cor=none, classe='') -%}
+<div class="barra {{ classe }}"><span style="width: {{ percentual }}%{% if cor %}; background: {{ cor }}{% endif %}"></span></div>
+{%- endmacro %}
+
+{% macro campo_valor(rotulo, valor='', autofocus=false) -%}
+<div class="campo-valor">
+  <label for="valor">{{ rotulo }}</label>
+  <div><span>R$</span><input id="valor" type="text" name="valor" value="{{ valor }}" placeholder="0,00"
+       required inputmode="decimal" autocomplete="off" {{ 'autofocus' if autofocus }}></div>
+</div>
+{%- endmacro %}
+
+{% macro lista_categorias(categorias) -%}
+<datalist id="categorias">{% for c in categorias %}<option value="{{ c }}">{% endfor %}</datalist>
+{%- endmacro %}

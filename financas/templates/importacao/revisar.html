@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import lista_categorias %}
+{% block title %}Revisar importação{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('importacao.enviar') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<form class="cartao" method="post">
+  <p class="texto-secundario">
+    {{ lancamentos|length }} lançamento(s) encontrado(s). Confira tipo, valor e categoria e desmarque o que não quiser importar.
+  </p>
+  <div class="tabela-rolavel">
+    <table class="tabela">
+      <thead><tr><th></th><th>Data</th><th>Descrição</th><th>Tipo</th><th>Valor</th><th>Categoria</th></tr></thead>
+      <tbody>
+        {% for l in lancamentos %}
+        {% set i = loop.index0 %}
+        <tr>
+          <td><input type="checkbox" name="incluir_{{ i }}" checked aria-label="Importar linha {{ loop.index }}"></td>
+          <td><input type="date" name="data_{{ i }}" value="{{ l.data }}"></td>
+          <td><input type="text" name="descricao_{{ i }}" value="{{ l.descricao }}" class="campo-largo"></td>
+          <td>
+            <select name="tipo_{{ i }}">
+              <option value="saida" {{ 'selected' if l.tipo == 'saida' }}>Saída</option>
+              <option value="entrada" {{ 'selected' if l.tipo == 'entrada' }}>Entrada</option>
+            </select>
+          </td>
+          <td><input type="text" name="valor_{{ i }}" value="{{ l.valor|valor_input }}" inputmode="decimal"></td>
+          <td><input type="text" name="categoria_{{ i }}" value="{{ l.categoria }}" list="categorias"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {{ lista_categorias(categorias) }}
+  <button type="submit" class="botao botao-largo">Confirmar e salvar</button>
+</form>
+{% endblock %}

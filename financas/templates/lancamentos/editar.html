@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% from "_componentes.html" import campo_valor, lista_categorias %}
+{% set t = lancamento %}
+{% block title %}Editar lançamento{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ voltar }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<div class="cartao">
+  <p class="texto-secundario texto-pequeno texto-centro">
+    Lançado por {{ t.nome }}
+    {%- if t.origem == 'conta_fixa' %} · pagamento da conta {{ t.conta_fixa_nome or t.descricao }}
+    {%- elif t.origem == 'pdf' %} · importado de PDF{% endif %}
+    {%- if eh_caixinha %} · caixinha {{ t.caixinha_nome or '—' }}{% endif %}
+  </p>
+
+  <form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="voltar" value="{{ voltar }}">
+
+    {% if eh_caixinha %}
+      <p class="texto-centro"><span class="selo">{{ 'Guardado na caixinha' if t.tipo == 'investimento_deposito' else 'Resgatado da caixinha' }}</span></p>
+    {% elif t.origem != 'conta_fixa' %}
+      <fieldset class="seletor">
+        <legend class="visualmente-oculto">Tipo</legend>
+        <label><input type="radio" name="tipo" value="entrada" {{ 'checked' if t.tipo == 'entrada' }}> Entrada</label>
+        <label><input type="radio" name="tipo" value="saida" {{ 'checked' if t.tipo == 'saida' }}> Saída</label>
+      </fieldset>
+    {% endif %}
+
+    {{ campo_valor('Valor', t.valor|valor_input) }}
+
+    <div class="campo">
+      <label for="descricao">Descrição</label>
+      <input id="descricao" type="text" name="descricao" value="{{ t.descricao }}" required>
+    </div>
+    <div class="campos-lado-a-lado">
+      <div class="campo">
+        <label for="data">Data</label>
+        <input id="data" type="date" name="data" value="{{ t.data }}" required>
+      </div>
+      {% if not eh_caixinha %}
+      <div class="campo">
+        <label for="categoria">Categoria</label>
+        <input id="categoria" type="text" name="categoria" list="categorias" value="{{ t.categoria or '' }}">
+      </div>
+      {% endif %}
+    </div>
+    {{ lista_categorias(categorias) }}
+
+    {% if not eh_caixinha %}
+    <div class="campo">
+      <label for="comprovante">{{ 'Trocar comprovante' if t.comprovante else 'Comprovante (opcional)' }}</label>
+      {% if t.comprovante %}
+      <div class="comprovante-atual">
+        <a href="{{ url_for('arquivos.comprovante', nome=t.comprovante) }}" target="_blank">{{ icone('anexo', 18) }} Ver comprovante atual</a>
+        <label><input type="checkbox" name="remover_comprovante"> Remover</label>
+      </div>
+      {% endif %}
+      <input id="comprovante" type="file" name="comprovante" accept=".pdf,.jpg,.jpeg,.png,.webp">
+    </div>
+    {% endif %}
+
+    {% if t.origem == 'conta_fixa' %}
+      <p class="dica">Valor, data e comprovante também são atualizados na conta.</p>
+    {% endif %}
+
+    <button type="submit" class="botao botao-largo">Salvar alterações</button>
+  </form>
+
+  <form method="post" action="{{ url_for('lancamentos.excluir', lancamento_id=t.id) }}"
+        data-confirmar="Excluir este lançamento?{{ ' A conta volta a ficar pendente.' if t.origem == 'conta_fixa' }}">
+    <input type="hidden" name="voltar" value="{{ voltar }}">
+    <button type="submit" class="botao botao-perigo botao-largo">{{ icone('lixeira', 18) }} Excluir lançamento</button>
+  </form>
+</div>
+{% endblock %}

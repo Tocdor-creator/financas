@@ -1,0 +1,67 @@
+{% from "_icones.html" import icone %}
+<!DOCTYPE html>
+<html lang="pt-br" style="--primaria: {{ tema.cor }}">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="{{ tema.cor }}">
+<title>{% block title %}{% endblock %} · Finanças da Casa</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+<script>
+  try { if (localStorage.getItem('valoresOcultos') === '1') document.documentElement.classList.add('valores-ocultos'); } catch (e) {}
+</script>
+</head>
+<body class="{{ 'autenticado' if g.user else 'publico' }}">
+{% if g.user %}
+{% set menu = [
+  ('inicio.index', 'Início', 'inicio', 'inicio'),
+  ('lancamentos.extrato', 'Extrato', 'extrato', 'lancamentos'),
+  ('contas.lista', 'Contas', 'contas', 'contas'),
+  ('caixinhas.lista', 'Caixinhas', 'caixinha', 'caixinhas'),
+  ('inicio.mais', 'Mais', 'mais', 'mais'),
+] %}
+{% set secao = 'mais' if request.endpoint == 'inicio.mais' or request.blueprint in ('previsao', 'importacao', 'perfil') else request.blueprint %}
+<header class="cabecalho">
+  <div class="cabecalho-barra">
+    <a class="marca" href="{{ url_for('inicio.index') }}">Finanças da Casa</a>
+    <nav class="menu-topo" aria-label="Menu principal">
+      {% for endpoint, rotulo, _, chave in menu %}
+      <a href="{{ url_for(endpoint) }}" {% if secao == chave %}aria-current="page"{% endif %}>{{ rotulo }}</a>
+      {% endfor %}
+    </nav>
+    <div class="cabecalho-acoes">
+      <button type="button" class="botao-redondo" id="alternar-valores" aria-label="Mostrar ou esconder valores">
+        <span class="se-visivel">{{ icone('olho') }}</span><span class="se-oculto">{{ icone('olho-fechado') }}</span>
+      </button>
+      <a class="avatar" href="{{ url_for('perfil.index') }}" title="Meu perfil">{{ g.user.display_name[:1]|upper }}</a>
+    </div>
+  </div>
+  <div class="cabecalho-titulo">
+    {% block cabecalho %}
+      {% block voltar %}{% endblock %}
+      <h1>{{ self.title() }}</h1>
+    {% endblock %}
+  </div>
+</header>
+{% endif %}
+
+<main class="conteudo">
+  {% for categoria, mensagem in get_flashed_messages(with_categories=true) %}
+    <div class="aviso aviso-{{ 'erro' if categoria == 'error' else 'sucesso' }}" role="status">{{ mensagem }}</div>
+  {% endfor %}
+  {% block content %}{% endblock %}
+</main>
+
+{% if g.user %}
+<nav class="menu-inferior" aria-label="Menu principal">
+  {% for endpoint, rotulo, nome_icone, chave in menu %}
+  <a href="{{ url_for(endpoint) }}" {% if secao == chave %}aria-current="page"{% endif %}>
+    {{ icone(nome_icone, 24) }}<span>{{ rotulo }}</span>
+  </a>
+  {% endfor %}
+</nav>
+{% endif %}
+{% block scripts %}{% endblock %}
+<script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>

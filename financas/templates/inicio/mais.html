@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% block title %}Mais{% endblock %}
+
+{% block content %}
+<nav class="cartao">
+  <ul class="lista">
+    {% for endpoint, nome_icone, titulo, descricao in [
+      ('previsao.index', 'grafico', 'Previsão x Realizado', 'Planejamento mensal comparado com o que aconteceu'),
+      ('importacao.enviar', 'importar', 'Importar extrato ou fatura', 'Lançamentos a partir de um PDF do banco'),
+      ('perfil.index', 'usuario', 'Meu perfil', 'Senha e cor do app'),
+      ('perfil.backup', 'download', 'Baixar backup', 'Cópia de todos os dados'),
+    ] %}
+    <li class="item">
+      <a class="item-link" href="{{ url_for(endpoint) }}" aria-label="{{ titulo }}"></a>
+      <span class="item-icone">{{ icone(nome_icone, 20) }}</span>
+      <div class="item-corpo">
+        <div class="item-titulo">{{ titulo }}</div>
+        <div class="item-detalhe">{{ descricao }}</div>
+      </div>
+      <span class="texto-secundario">{{ icone('seta-direita', 20) }}</span>
+    </li>
+    {% endfor %}
+  </ul>
+</nav>
+
+<a class="botao botao-perigo botao-largo" href="{{ url_for('auth.logout') }}">{{ icone('sair', 18) }} Sair</a>
+{% endblock %}

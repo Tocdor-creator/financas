@@ -1,0 +1,32 @@
+{% extends "base.html" %}
+{% from "_icones.html" import icone %}
+{% block title %}Previsão x Realizado{% endblock %}
+{% block voltar %}<a class="voltar" href="{{ url_for('inicio.mais') }}" aria-label="Voltar">{{ icone('seta-esquerda', 24) }}</a>{% endblock %}
+
+{% block content %}
+<section class="cartao">
+  <p class="texto-secundario">Planejado (linhas tracejadas) comparado com o que realmente aconteceu.</p>
+  <div class="grafico grafico-alto"><canvas data-grafico='{{ grafico|tojson }}'></canvas></div>
+</section>
+
+<form class="cartao" method="post">
+  <h2>Planejamento por mês</h2>
+  <div class="tabela-rolavel">
+    <table class="tabela">
+      <thead><tr><th>Mês</th><th>Gastos planejados</th><th>Ganhos planejados</th></tr></thead>
+      <tbody>
+        {% for m in meses %}
+        <tr>
+          <th scope="row">{{ m.nome }}<input type="hidden" name="competencia" value="{{ m.competencia }}"></th>
+          <td><input type="text" name="planejado_gastos" value="{{ m.planejado_gastos|valor_input }}" inputmode="decimal" aria-label="Gastos planejados em {{ m.nome }}"></td>
+          <td><input type="text" name="planejado_ganhos" value="{{ m.planejado_ganhos|valor_input }}" inputmode="decimal" aria-label="Ganhos planejados em {{ m.nome }}"></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <button type="submit" class="botao botao-largo">Salvar planejamento</button>
+</form>
+{% endblock %}
+
+{% block scripts %}<script src="{{ url_for('static', filename='js/vendor/chart.umd.min.js') }}"></script>{% endblock %}
